@@ -1,21 +1,3 @@
 {
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true,
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "explicit"
-  },
-  "files.eol": "\n",
-  "files.insertFinalNewline": true,
-  "files.trimTrailingWhitespace": true,
-  "search.exclude": {
-    "**/node_modules": true,
-    "**/.next": true,
-    "**/dist": true,
-    "**/.git": true
-  },
-  "files.exclude": {
-    "**/.next": true
-  }
+  "css.lint.unknownAtRules": "ignore"
 }

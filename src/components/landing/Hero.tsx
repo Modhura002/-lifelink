@@ -130,7 +130,7 @@ export default function Hero() {
             {/* Main Headline with typing/reveal animation */}
             <motion.h1
               variants={itemVariants}
-              className="mt-6 text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl"
+              className="mt-6 text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl"
             >
               Every Second Matters.{' '}
               <TypingText />
@@ -148,11 +148,11 @@ export default function Hero() {
             {/* CTA Buttons */}
             <motion.div
               variants={itemVariants}
-              className="mt-8 flex flex-wrap items-center gap-4"
+              className="mt-8 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center w-full sm:w-auto gap-4"
             >
               <Button
                 size="lg"
-                className="bg-emergency hover:bg-emergency/90 text-emergency-foreground h-12 px-8 text-base font-semibold shadow-lg shadow-emergency/25"
+                className="w-full sm:w-auto bg-emergency hover:bg-emergency/90 text-emergency-foreground h-12 px-6 sm:px-8 text-base font-semibold shadow-lg shadow-emergency/25"
                 onClick={() => useNavigationStore.getState().setCurrentPage('signup')}
               >
                 <Phone className="size-5" />
@@ -161,7 +161,7 @@ export default function Hero() {
               <Button
                 size="lg"
                 variant="outline"
-                className="h-12 border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white px-8 text-base font-semibold"
+                className="w-full sm:w-auto h-12 border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white px-6 sm:px-8 text-base font-semibold"
                 onClick={() => setShowDemo(true)}
               >
                 <Play className="size-5" />
