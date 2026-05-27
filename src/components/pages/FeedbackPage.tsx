@@ -146,7 +146,7 @@ export default function FeedbackPage() {
         variants={fadeUp}
         initial="hidden"
         animate="show"
-        className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] p-6"
+        className="flex flex-col items-center justify-center min-h-[calc(100dvh-64px)] p-6"
       >
         <Card className="max-w-md w-full text-center">
           <CardContent className="p-8 space-y-4">

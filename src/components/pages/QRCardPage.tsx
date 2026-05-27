@@ -106,11 +106,13 @@ export default function QRCardPage() {
   ];
 
   // QR Code data as a URL for phone scanning
-  const [qrData, setQrData] = useState(`${process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'}/emergency/${patient.id}`);
+  const [qrData, setQrData] = useState('');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (typeof window !== 'undefined') {
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+      const baseUrl = window.location.origin || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
       setQrData(`${baseUrl}/emergency/${patient.id}`);
     }
   }, [patient.id]);
@@ -242,21 +244,23 @@ export default function QRCardPage() {
       {/* Hidden QR for download */}
       <div className="fixed left-[-9999px] top-[-9999px]" aria-hidden="true">
         <div id="qr-download-source">
-          <QRCodeSVG
-            value={qrData}
-            size={220}
-            fgColor={CARD_VARIANTS[cardVariant].qrFg}
-            bgColor="#ffffff"
-            level="H"
-            imageSettings={{
-              src: `data:image/svg+xml;base64,${btoa(
-                `<svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7L12 2z" fill="${variant.accent === 'bg-sky-500' ? '#0284c7' : variant.accent === 'bg-red-500' ? '#dc2626' : '#475569'}" /><path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`
-              )}`,
-              height: 44,
-              width: 44,
-              excavate: true,
-            }}
-          />
+          {mounted && qrData && (
+            <QRCodeSVG
+              value={qrData}
+              size={220}
+              fgColor={CARD_VARIANTS[cardVariant].qrFg}
+              bgColor="#ffffff"
+              level="H"
+              imageSettings={{
+                src: `data:image/svg+xml;base64,${btoa(
+                  `<svg width="40" height="40" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7L12 2z" fill="${variant.accent === 'bg-sky-500' ? '#0284c7' : variant.accent === 'bg-red-500' ? '#dc2626' : '#475569'}" /><path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`
+                )}`,
+                height: 44,
+                width: 44,
+                excavate: true,
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -318,22 +322,26 @@ export default function QRCardPage() {
                           </div>
                         </div>
                         {/* Real QR Code */}
-                        <div className="bg-white rounded-lg p-1.5 relative">
-                          <QRCodeSVG
-                            value={qrData}
-                            size={96}
-                            fgColor={variant.qrFg}
-                            bgColor="#ffffff"
-                            level="H"
-                            imageSettings={{
-                              src: `data:image/svg+xml;base64,${btoa(
-                                `<svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7L12 2z" fill="${variant.accent === 'bg-sky-500' ? '#0284c7' : variant.accent === 'bg-red-500' ? '#dc2626' : '#475569'}" opacity="0.9"/><path d="M9 12l2 2 4-4" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`
-                              )}`,
-                              height: 22,
-                              width: 22,
-                              excavate: true,
-                            }}
-                          />
+                        <div className="bg-white rounded-lg p-1.5 relative w-[108px] h-[108px] flex items-center justify-center">
+                          {mounted && qrData ? (
+                            <QRCodeSVG
+                              value={qrData}
+                              size={96}
+                              fgColor={variant.qrFg}
+                              bgColor="#ffffff"
+                              level="H"
+                              imageSettings={{
+                                src: `data:image/svg+xml;base64,${btoa(
+                                  `<svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7L12 2z" fill="${variant.accent === 'bg-sky-500' ? '#0284c7' : variant.accent === 'bg-red-500' ? '#dc2626' : '#475569'}" opacity="0.9"/><path d="M9 12l2 2 4-4" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`
+                                )}`,
+                                height: 22,
+                                width: 22,
+                                excavate: true,
+                              }}
+                            />
+                          ) : (
+                            <div className="w-[96px] h-[96px] bg-slate-100 animate-pulse rounded" />
+                          )}
                         </div>
                       </div>
                     </div>

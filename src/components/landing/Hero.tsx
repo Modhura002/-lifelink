@@ -108,7 +108,7 @@ export default function Hero() {
         className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
         style={{ y: parallaxY, opacity: parallaxOpacity }}
       >
-        <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center gap-12 lg:flex-row lg:gap-16">
+        <div className="flex min-h-[calc(100dvh-4rem)] flex-col items-center justify-center gap-12 lg:flex-row lg:gap-16">
           {/* Left Content */}
           <motion.div
             variants={containerVariants}

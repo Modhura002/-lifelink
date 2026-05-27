@@ -132,7 +132,7 @@ export default function NotificationPanel({
         </div>
 
         {/* Notification List */}
-        <ScrollArea className="flex-1 h-[calc(100vh-11rem)]">
+        <ScrollArea className="flex-1 h-[calc(100dvh-11rem)]">
           <div className="px-4 py-2">
             {filteredNotifications.length === 0 ? (
               <motion.div

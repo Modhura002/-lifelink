@@ -135,7 +135,7 @@ export default function TrackingPage() {
         variants={fadeIn}
         initial="hidden"
         animate="show"
-        className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] p-6"
+        className="flex flex-col items-center justify-center min-h-[calc(100dvh-64px)] p-6"
       >
         <motion.div
           className="max-w-md w-full text-center"
@@ -206,13 +206,13 @@ export default function TrackingPage() {
 
   /* ---- Active Emergency ---- */
   return (
-    <div className="flex flex-col lg:flex-row" style={{ height: 'calc(100vh - 64px)' }}>
+    <div className="flex flex-col lg:flex-row" style={{ height: 'calc(100dvh - 64px)' }}>
       {/* Map Area */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="relative flex-1 lg:w-[65%] bg-slate-900 dark:bg-slate-950 overflow-hidden"
+        className="relative flex-1 lg:w-[65%] min-h-[50dvh] lg:min-h-0 bg-slate-900 dark:bg-slate-950 overflow-hidden"
       >
         <MapWrapper
           center={ambulancePos}

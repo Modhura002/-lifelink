@@ -57,6 +57,18 @@ function MapController({ center, zoom }: { center: [number, number]; zoom?: numb
   return null;
 }
 
+function MapResizer() {
+  const map = useMap();
+  useEffect(() => {
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
 export type MapMarker = {
   id: string | number;
   position: [number, number];
@@ -106,6 +118,7 @@ export default function DynamicMap({ center, zoom = 13, markers = [], route = []
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
+        <MapResizer />
         {autoCenter && <MapController center={center} zoom={zoom} />}
 
         {route.length > 0 && (

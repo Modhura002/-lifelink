@@ -37,7 +37,7 @@ export default function EmergencyProfileRoute({ params }: { params: Promise<{ id
   return (
     <div style={{
       width: '100%',
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: '#f3f4f6',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       WebkitTextSizeAdjust: '100%',

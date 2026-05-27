@@ -93,11 +93,13 @@ export default function EmergencyProfilePage() {
   const age = calculateAge(patient.dateOfBirth || '1990-01-01');
   const bloodLabel = BLOOD_GROUP_LABELS[patient.bloodGroup || 'O_POS'];
 
-  const [qrData, setQrData] = useState(`${process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'}/emergency/${patient.id}`);
+  const [qrData, setQrData] = useState('');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (typeof window !== 'undefined') {
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+      const baseUrl = window.location.origin || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
       setQrData(`${baseUrl}/emergency/${patient.id}`);
     }
   }, [patient.id]);
@@ -490,21 +492,25 @@ export default function EmergencyProfilePage() {
               <p className="text-xs text-muted-foreground mb-4 max-w-xs">
                 Scan this QR code to access this patient&apos;s emergency medical profile from any device
               </p>
-              <div className="bg-white p-4 rounded-2xl shadow-md border print:shadow-none">
-                <QRCodeSVG
-                  value={qrData}
-                  size={180}
-                  bgColor="#ffffff"
-                  fgColor="#18181b"
-                  level="H"
-                  includeMargin={false}
-                  imageSettings={{
-                    src: '',
-                    height: 0,
-                    width: 0,
-                    excavate: false,
-                  }}
-                />
+              <div className="bg-white p-4 rounded-2xl shadow-md border print:shadow-none w-[214px] h-[214px] flex items-center justify-center">
+                {mounted && qrData ? (
+                  <QRCodeSVG
+                    value={qrData}
+                    size={180}
+                    bgColor="#ffffff"
+                    fgColor="#18181b"
+                    level="H"
+                    includeMargin={false}
+                    imageSettings={{
+                      src: '',
+                      height: 0,
+                      width: 0,
+                      excavate: false,
+                    }}
+                  />
+                ) : (
+                  <div className="w-[180px] h-[180px] bg-slate-100 animate-pulse rounded" />
+                )}
               </div>
               <p className="text-[10px] text-muted-foreground/60 mt-3 font-mono">
                 ID: {patient.id}

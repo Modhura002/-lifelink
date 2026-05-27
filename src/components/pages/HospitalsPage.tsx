@@ -275,13 +275,14 @@ export default function HospitalsPage() {
   }, [userLocation, realHospitals]);
 
   const hospitalsWithDistance = useMemo<HospitalWithDistance[]>(() => {
-    const refLat = userLocation ? userLocation.lat : REFERENCE_LAT;
-    const refLng = userLocation ? userLocation.lng : REFERENCE_LNG;
+    const useFallback = geoStatus === 'denied' || geoStatus === 'error';
+    const refLat = userLocation ? userLocation.lat : (useFallback ? REFERENCE_LAT : null);
+    const refLng = userLocation ? userLocation.lng : (useFallback ? REFERENCE_LNG : null);
     return sourceHospitals.map((h) => ({
       ...h,
-      distanceKm: +haversineDistance(refLat, refLng, h.latitude, h.longitude).toFixed(1),
+      distanceKm: (refLat && refLng) ? +haversineDistance(refLat, refLng, h.latitude, h.longitude).toFixed(1) : 0,
     }));
-  }, [sourceHospitals, userLocation]);
+  }, [sourceHospitals, userLocation, geoStatus]);
 
   const allSpecialties = useMemo(() => {
     return Array.from(new Set(hospitalsWithDistance.flatMap((h) => h.specializations))).sort();
@@ -603,7 +604,7 @@ export default function HospitalsPage() {
                     <strong className="block mb-1 border-b pb-1">{h.name}</strong>
                     <div className="flex justify-between text-xs my-1">
                       <span className="text-muted-foreground">Distance:</span>
-                      <span className="font-semibold">{h.distanceKm} km</span>
+                      <span className="font-semibold">{(userLocation || geoStatus === 'denied' || geoStatus === 'error') ? `${h.distanceKm} km` : '—'}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Available Beds:</span>
@@ -707,7 +708,7 @@ export default function HospitalsPage() {
                         </div>
                         <div className="text-center p-2 rounded-lg bg-muted/50">
                           <Navigation className="h-4 w-4 mx-auto text-primary mb-0.5" />
-                          <p className="text-sm font-bold">{hospital.distanceKm}</p>
+                          <p className="text-sm font-bold">{(userLocation || geoStatus === 'denied' || geoStatus === 'error') ? hospital.distanceKm : '—'}</p>
                           <p className="text-[10px] text-muted-foreground">km Away</p>
                         </div>
                       </div>
