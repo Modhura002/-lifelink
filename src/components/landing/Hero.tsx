@@ -130,7 +130,7 @@ export default function Hero() {
             {/* Main Headline with typing/reveal animation */}
             <motion.h1
               variants={itemVariants}
-              className="mt-6 text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl"
+              className="mt-6 text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight text-white break-words"
             >
               Every Second Matters.{' '}
               <TypingText />

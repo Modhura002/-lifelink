@@ -175,8 +175,8 @@ export default function HospitalDashboard() {
             <AlertTriangle className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Emergency Queue</h1>
-            <p className="text-muted-foreground text-sm">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words">Emergency Queue</h1>
+            <p className="text-muted-foreground text-sm break-words line-clamp-2">
               {hospital.name} &middot;{' '}
               <span className="inline-flex items-center gap-1.5">
                 <LivePulse />
@@ -188,7 +188,7 @@ export default function HospitalDashboard() {
       </motion.div>
 
       {/* Stat Cards */}
-      <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
           { icon: BedDouble, label: 'Available Beds', value: bedStats.available, color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
           { icon: Activity, label: 'Occupied', value: bedStats.occupied, color: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400' },
@@ -196,15 +196,15 @@ export default function HospitalDashboard() {
           { icon: Clock, label: 'Avg Wait Time', value: '12m', color: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400' },
         ].map((stat) => (
           <motion.div key={stat.label} variants={fadeUp}>
-            <Card className="card-hover">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${stat.color}`}>
-                    <stat.icon className="h-5 w-5" />
+            <Card className="card-hover overflow-hidden">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <div className={`p-2 rounded-lg shrink-0 ${stat.color}`}>
+                    <stat.icon className="h-4 w-4 sm:h-5 sm:w-5" />
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
-                    <p className="text-lg font-bold">{stat.value}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground break-words line-clamp-1">{stat.label}</p>
+                    <p className="text-base sm:text-lg font-bold leading-tight truncate">{stat.value}</p>
                   </div>
                 </div>
               </CardContent>

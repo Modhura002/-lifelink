@@ -179,11 +179,11 @@ export default function EnhancedStatCards() {
     >
       {cards.map((card) => (
         <motion.div key={card.id} variants={fadeUp}>
-          <Card className={cn('card-hover border-l-4', card.borderColor)}>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <card.icon className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <Card className={cn('card-hover border-l-4 overflow-hidden', card.borderColor)}>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 mb-2 min-w-0">
+                <card.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide break-words line-clamp-1">
                   {card.title}
                 </span>
               </div>

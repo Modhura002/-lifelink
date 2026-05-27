@@ -249,25 +249,25 @@ export default function AdminDashboard() {
             <BarChart3 className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-            <p className="text-muted-foreground text-sm">System-wide overview and management</p>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words">Admin Dashboard</h1>
+            <p className="text-muted-foreground text-sm break-words line-clamp-2">System-wide overview and management</p>
           </div>
         </div>
       </motion.div>
 
       {/* Stat Cards with Sparklines */}
-      <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {overviewCards.map((card) => (
           <motion.div key={card.label} variants={fadeUp}>
-            <Card className="card-hover">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
+            <Card className="card-hover overflow-hidden">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   <div className={`p-2 rounded-lg shrink-0 ${card.color}`}>
-                    <card.icon className="h-5 w-5" />
+                    <card.icon className="h-4 w-4 sm:h-5 sm:w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-muted-foreground">{card.label}</p>
-                    <p className="text-lg font-bold leading-tight">{card.value}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground break-words line-clamp-1">{card.label}</p>
+                    <p className="text-base sm:text-lg font-bold leading-tight truncate">{card.value}</p>
                   </div>
                 </div>
                 <Sparkline data={sparklineData[card.sparkKey as keyof typeof sparklineData]} colorKey={card.sparkColor} />

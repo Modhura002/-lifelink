@@ -94,10 +94,10 @@ export default function DriverDashboard() {
   const sev = SEVERITY_LABELS[currentAssignment.severity] || SEVERITY_LABELS[1];
 
   return (
-    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6 p-4 md:p-6">
+    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6 p-4 md:p-6 min-w-0">
       <motion.div variants={fadeUp}>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">My Assignments</h1>
-        <p className="text-muted-foreground mt-1">Welcome back, Rajesh</p>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words">My Assignments</h1>
+        <p className="text-muted-foreground mt-1 break-words">Welcome back, Rajesh</p>
       </motion.div>
 
       {/* Current Assignment */}
@@ -240,18 +240,18 @@ export default function DriverDashboard() {
       </motion.div>
 
       {/* Today's Stats */}
-      <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {todaysStats.map((stat) => (
           <motion.div key={stat.label} variants={fadeUp}>
-            <Card className="card-hover">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-xl ${stat.color}`}>
-                    <stat.icon className="h-5 w-5" />
+            <Card className="card-hover overflow-hidden">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <div className={`p-2 sm:p-2.5 rounded-xl shrink-0 ${stat.color}`}>
+                    <stat.icon className="h-4 w-4 sm:h-5 sm:w-5" />
                   </div>
-                  <div>
-                    <p className="text-xl font-bold">{stat.value}</p>
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  <div className="min-w-0">
+                    <p className="text-lg sm:text-xl font-bold truncate">{stat.value}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground break-words line-clamp-2">{stat.label}</p>
                   </div>
                 </div>
               </CardContent>

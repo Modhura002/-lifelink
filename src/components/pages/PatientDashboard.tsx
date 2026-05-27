@@ -48,10 +48,10 @@ export default function PatientDashboard() {
     >
       {/* Header */}
       <motion.div variants={fadeUp}>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words">
           Welcome back, {user?.name?.split(' ')[0] || patient.name.split(' ')[0]}
         </h1>
-        <p className="text-muted-foreground mt-1">Here&apos;s your health overview</p>
+        <p className="text-muted-foreground mt-1 break-words">Here&apos;s your health overview</p>
       </motion.div>
 
       {/* Enhanced Stat Cards */}

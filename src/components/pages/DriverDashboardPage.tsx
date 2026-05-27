@@ -357,10 +357,10 @@ export default function DriverDashboardPage() {
       </AnimatePresence>
 
       {/* ──── Page Title ──── */}
-      <motion.div variants={fadeUp} className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Driver Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Manage your assignments and track performance</p>
+      <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words">Driver Dashboard</h1>
+          <p className="text-muted-foreground mt-1 break-words text-sm sm:text-base">Manage your assignments and track performance</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Signal className="h-4 w-4" />
@@ -413,7 +413,7 @@ export default function DriverDashboardPage() {
       </motion.div>
 
       {/* ──── 2. Stats Row ──── */}
-      <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         {[
           {
             label: "Today's Trips",
@@ -452,20 +452,20 @@ export default function DriverDashboardPage() {
             iconBg: 'bg-amber-100 dark:bg-amber-900/40 text-amber-500',
           },
         ].map((stat) => (
-          <Card key={stat.label} className="card-hover">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${stat.iconBg}`}>
+          <Card key={stat.label} className="card-hover overflow-hidden">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-start justify-between min-w-0 gap-1">
+                <div className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center shrink-0 ${stat.iconBg}`}>
                   {stat.icon}
                 </div>
-                <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                <div className="flex items-center gap-1 text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 font-medium whitespace-nowrap">
                   {trendIcon(stat.trend)}
                   {stat.trend}
                 </div>
               </div>
-              <div className="mt-3">
-                <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
+              <div className="mt-2 sm:mt-3 min-w-0">
+                <p className="text-lg sm:text-2xl font-bold tracking-tight truncate">{stat.value}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 break-words line-clamp-1">{stat.label}</p>
               </div>
             </CardContent>
           </Card>
