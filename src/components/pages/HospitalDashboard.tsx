@@ -8,7 +8,9 @@ import {
   Activity,
   Clock,
   TrendingDown,
+  ScanLine,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -32,6 +34,8 @@ import {
   SEVERITY_LABELS,
 } from '@/lib/mock-data';
 import { STATUS_COLORS } from '@/lib/constants';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import { useNavigationStore } from '@/store';
 
 // ──────────────────────────────────────────────
 // Animation variants
@@ -135,6 +139,7 @@ const BED_TYPE_COLORS: Record<string, string> = {
 // Main component
 // ──────────────────────────────────────────────
 export default function HospitalDashboard() {
+  const { setCurrentPage } = useNavigationStore();
   const hospital = DEMO_HOSPITALS[2]; // AIIMS
   const pendingEmergencies = DEMO_EMERGENCIES.filter(
     (e) => e.hospitalId === hospital.id && !['COMPLETED', 'CANCELLED'].includes(e.status)
@@ -168,43 +173,52 @@ export default function HospitalDashboard() {
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
-      {/* Header */}
-      <motion.div variants={fadeUp}>
-        <div className="flex items-center gap-3 mb-1">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <AlertTriangle className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words">Emergency Queue</h1>
-            <p className="text-muted-foreground text-sm break-words line-clamp-2">
-              {hospital.name} &middot;{' '}
-              <span className="inline-flex items-center gap-1.5">
-                <LivePulse />
-                {pendingEmergencies.length} active
-              </span>
-            </p>
-          </div>
-        </div>
-      </motion.div>
+      {/* Hero Header */}
+      <DashboardHero
+        greeting="Hospital Operations"
+        name={hospital.name}
+        subtitle={`Emergency queue · ${pendingEmergencies.length} active incoming · ${bedStats.available} beds available`}
+        gradient="linear-gradient(135deg, #0c4a6e 0%, #075985 40%, #0f172a 100%)"
+        accentColor="rgba(14,165,233,0.3)"
+        icon={<AlertTriangle className="w-6 h-6 text-sky-300" />}
+        badge="Hospital Staff"
+        stats={[
+          { value: String(pendingEmergencies.length), label: 'Active emergencies' },
+          { value: String(bedStats.available), label: 'Available beds' },
+          { value: `${occupancyRate}%`, label: 'Occupancy rate' },
+          { value: '12 min', label: 'Avg wait time' },
+        ]}
+      />
 
       {/* Stat Cards */}
-      <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { icon: BedDouble, label: 'Available Beds', value: bedStats.available, color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
           { icon: Activity, label: 'Occupied', value: bedStats.occupied, color: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400' },
           { icon: TrendingDown, label: 'Reserved', value: bedStats.reserved, color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400' },
           { icon: Clock, label: 'Avg Wait Time', value: '12m', color: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400' },
         ].map((stat) => (
-          <motion.div key={stat.label} variants={fadeUp}>
-            <Card className="card-hover overflow-hidden">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                  <div className={`p-2 rounded-lg shrink-0 ${stat.color}`}>
-                    <stat.icon className="h-4 w-4 sm:h-5 sm:w-5" />
+          <motion.div
+            key={stat.label}
+            variants={fadeUp}
+            whileHover={{
+              scale: 1.05,
+              rotateX: -4,
+              rotateY: 4,
+              z: 20,
+              transition: { type: 'spring', stiffness: 400, damping: 20 },
+            }}
+            style={{ perspective: 800, transformStyle: 'preserve-3d' }}
+          >
+            <Card className="card-hover shadow-sm hover:shadow-lg transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${stat.color}`}>
+                    <stat.icon className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] sm:text-xs text-muted-foreground break-words line-clamp-1">{stat.label}</p>
-                    <p className="text-base sm:text-lg font-bold leading-tight truncate">{stat.value}</p>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    <p className="text-lg font-bold">{stat.value}</p>
                   </div>
                 </div>
               </CardContent>
@@ -415,6 +429,17 @@ export default function HospitalDashboard() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Floating Scanner Button */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <Button
+          size="lg"
+          className="rounded-full h-16 w-16 shadow-2xl flex items-center justify-center bg-primary hover:bg-primary/90 hover:scale-105 transition-all"
+          onClick={() => setCurrentPage('hospital-scanner')}
+        >
+          <ScanLine className="h-7 w-7 text-white" />
+        </Button>
+      </div>
     </motion.div>
   );
 }

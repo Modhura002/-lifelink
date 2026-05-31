@@ -117,15 +117,15 @@ export default function Stats() {
           transition={{ duration: 0.5 }}
           className="mx-auto max-w-2xl text-center"
         >
-          <span className="inline-block rounded-full bg-emergency/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-emergency">
-            Live Dashboard
+          <span className="inline-block rounded-full border border-emergency/30 bg-emergency/10 px-5 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-emergency">
+            Live Network
           </span>
-          <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-            Numbers That{' '}
-            <span className="gradient-text">Save Lives</span>
+          <h2 className="mt-4 font-black tracking-tight" style={{ fontSize: 'clamp(2rem, 4.5vw, 3.5rem)', lineHeight: 1.1 }}>
+            Numbers that{' '}
+            <span className="gradient-text">save lives.</span>
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Real-time metrics from our emergency response network, updated every minute.
+            Real-time metrics from our emergency response network across 200+ cities.
           </p>
         </motion.div>
 
@@ -140,8 +140,16 @@ export default function Stats() {
               initial={{ opacity: 0, y: 30 }}
               animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
+              whileHover={{
+                scale: 1.06,
+                rotateX: -5,
+                rotateY: 5,
+                z: 30,
+                transition: { type: 'spring', stiffness: 300, damping: 20 },
+              }}
+              style={{ perspective: 900, transformStyle: 'preserve-3d' }}
             >
-              <div className="card-hover group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-6 text-center backdrop-blur-sm">
+              <div className="card-hover group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-6 text-center backdrop-blur-sm shadow-sm hover:shadow-xl transition-shadow">
                 {/* Subtle gradient overlay on hover */}
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent to-primary/5 opacity-0 transition-opacity group-hover:opacity-100" />
 

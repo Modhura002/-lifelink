@@ -45,7 +45,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { DEMO_PATIENTS } from '@/lib/mock-data';
+
 import { BLOOD_GROUP_LABELS } from '@/lib/constants';
 import type { MedicalRecord } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -60,57 +60,7 @@ const fadeUp = {
 };
 
 // Mock documents
-const MOCK_DOCUMENTS: MedicalRecord[] = [
-  {
-    id: 'doc-1',
-    userId: 'usr-patient-1',
-    title: 'Annual Health Checkup Report',
-    type: 'LAB_REPORT',
-    fileUrl: '#',
-    notes: 'All vitals normal',
-    date: '2024-11-15',
-    createdAt: '2024-11-15T10:00:00Z',
-  },
-  {
-    id: 'doc-2',
-    userId: 'usr-patient-1',
-    title: 'Metformin Prescription - Dr. Sharma',
-    type: 'PRESCRIPTION',
-    fileUrl: '#',
-    notes: '500mg twice daily',
-    date: '2024-10-20',
-    createdAt: '2024-10-20T14:00:00Z',
-  },
-  {
-    id: 'doc-3',
-    userId: 'usr-patient-1',
-    title: 'Chest X-Ray',
-    type: 'SCAN',
-    fileUrl: '#',
-    date: '2024-09-05',
-    createdAt: '2024-09-05T09:00:00Z',
-  },
-  {
-    id: 'doc-4',
-    userId: 'usr-patient-1',
-    title: 'Discharge Summary - Fortis Memorial',
-    type: 'DISCHARGE_SUMMARY',
-    fileUrl: '#',
-    notes: 'Mild fever and dehydration - treated and discharged',
-    date: '2024-09-20',
-    createdAt: '2024-09-20T18:00:00Z',
-  },
-  {
-    id: 'doc-5',
-    userId: 'usr-patient-1',
-    title: 'Blood Work Panel',
-    type: 'LAB_REPORT',
-    fileUrl: '#',
-    notes: 'CBC, Lipid profile, HbA1c',
-    date: '2024-12-01',
-    createdAt: '2024-12-01T11:30:00Z',
-  },
-];
+const MOCK_DOCUMENTS: MedicalRecord[] = [];
 
 const DOC_ICONS: Record<string, typeof FileText> = {
   PRESCRIPTION: ClipboardList,
@@ -166,44 +116,12 @@ const ALLERGY_SEVERITY: Record<string, { color: string; border: string; label: s
 };
 
 // Mock timeline visits
-const RECENT_VISITS = [
-  { id: 'v1', title: 'Dr. Ananya Gupta', specialty: 'General Physician', date: '2024-12-10', note: 'Routine follow-up, vitals stable' },
-  { id: 'v2', title: 'Dr. Sunita Rao', specialty: 'Endocrinologist', date: '2024-11-15', note: 'HbA1c review, adjusted Metformin dose' },
-  { id: 'v3', title: 'Fortis Memorial', specialty: 'Emergency', date: '2024-09-20', note: 'Fever and dehydration, discharged same day' },
-];
+const RECENT_VISITS: any[] = [];
 
-const UPCOMING_APPOINTMENTS = [
-  { id: 'a1', doctor: 'Dr. Ramesh Iyer', specialty: 'Cardiologist', date: 'Dec 28, 2024', time: '10:30 AM' },
-  { id: 'a2', doctor: 'Dr. Sunita Rao', specialty: 'Endocrinologist', date: 'Jan 5, 2025', time: '2:00 PM' },
-];
+const UPCOMING_APPOINTMENTS: any[] = [];
 
 // Mock extended medications
-const MEDICATIONS = [
-  {
-    name: 'Metformin 500mg',
-    dosage: '500mg',
-    frequency: 'Twice daily',
-    doctor: 'Dr. Sunita Rao',
-    status: 'active' as const,
-    times: ['morning', 'night'] as const,
-  },
-  {
-    name: 'Lisinopril 10mg',
-    dosage: '10mg',
-    frequency: 'Once daily',
-    doctor: 'Dr. Ramesh Iyer',
-    status: 'active' as const,
-    times: ['morning'] as const,
-  },
-  {
-    name: 'Aspirin 75mg',
-    dosage: '75mg',
-    frequency: 'Once daily',
-    doctor: 'Dr. Ramesh Iyer',
-    status: 'completed' as const,
-    times: ['afternoon'] as const,
-  },
-];
+const MEDICATIONS: any[] = [];
 
 function HealthScoreRing({ score }: { score: number }) {
   const radius = 52;
@@ -244,7 +162,7 @@ function TimeOfDayIcon({ time }: { time: 'morning' | 'afternoon' | 'night' }) {
 }
 
 export default function MedicalRecordsPage() {
-  const patient = DEMO_PATIENTS[0];
+  const patient = { bloodGroup: 'O+', chronicConditions: [] };
   const [docFilter, setDocFilter] = useState<string>('all');
   const [showAddMedication, setShowAddMedication] = useState(false);
   const [showAddAllergy, setShowAddAllergy] = useState(false);
@@ -256,11 +174,7 @@ export default function MedicalRecordsPage() {
 
   const bmi = (72 / (1.75 * 1.75)).toFixed(1);
 
-  const allergyData = [
-    { name: 'Penicillin', severity: 'Severe', reaction: 'Anaphylaxis risk', onset: 'Immediate' },
-    { name: 'Sulfa Drugs', severity: 'Moderate', reaction: 'Skin rash, hives', onset: '24-48 hours' },
-    { name: 'Dust Mites', severity: 'Mild', reaction: 'Sneezing, congestion', onset: 'Delayed' },
-  ];
+  const allergyData: any[] = [];
 
   return (
     <motion.div

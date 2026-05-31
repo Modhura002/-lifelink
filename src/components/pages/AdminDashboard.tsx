@@ -37,6 +37,8 @@ import {
   SEVERITY_LABELS,
 } from '@/lib/mock-data';
 import { STATUS_COLORS } from '@/lib/constants';
+import EmergencyRadar from '@/components/dashboard/EmergencyRadar';
+import DashboardHero from '@/components/dashboard/DashboardHero';
 
 // ──────────────────────────────────────────────
 // Mock chart data
@@ -242,32 +244,47 @@ export default function AdminDashboard() {
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
-      {/* Header */}
-      <motion.div variants={fadeUp}>
-        <div className="flex items-center gap-3 mb-1">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <BarChart3 className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words">Admin Dashboard</h1>
-            <p className="text-muted-foreground text-sm break-words line-clamp-2">System-wide overview and management</p>
-          </div>
-        </div>
-      </motion.div>
+      {/* Hero Header */}
+      <DashboardHero
+        greeting="System Command Center"
+        name="Admin Dashboard"
+        subtitle="Network-wide overview · Real-time emergency coordination"
+        gradient="linear-gradient(135deg, #2e1065 0%, #3730a3 50%, #0f172a 100%)"
+        accentColor="rgba(139,92,246,0.3)"
+        icon={<BarChart3 className="w-6 h-6 text-violet-300" />}
+        badge="Administrator"
+        stats={[
+          { value: String(DASHBOARD_STATS.activeEmergencies), label: 'Active emergencies' },
+          { value: String(DASHBOARD_STATS.hospitalsOnline), label: 'Hospitals online' },
+          { value: String(DASHBOARD_STATS.ambulancesOnline), label: 'Ambulances active' },
+          { value: `${DASHBOARD_STATS.avgResponseTime} min`, label: 'Avg response' },
+        ]}
+      />
 
       {/* Stat Cards with Sparklines */}
-      <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      <motion.div variants={stagger} className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {overviewCards.map((card) => (
-          <motion.div key={card.label} variants={fadeUp}>
-            <Card className="card-hover overflow-hidden">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <motion.div
+            key={card.label}
+            variants={fadeUp}
+            whileHover={{
+              scale: 1.04,
+              rotateX: -4,
+              rotateY: 4,
+              z: 20,
+              transition: { type: 'spring', stiffness: 400, damping: 20 },
+            }}
+            style={{ perspective: 800, transformStyle: 'preserve-3d' }}
+          >
+            <Card className="card-hover shadow-sm hover:shadow-lg transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg shrink-0 ${card.color}`}>
-                    <card.icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <card.icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] sm:text-xs text-muted-foreground break-words line-clamp-1">{card.label}</p>
-                    <p className="text-base sm:text-lg font-bold leading-tight truncate">{card.value}</p>
+                    <p className="text-xs text-muted-foreground">{card.label}</p>
+                    <p className="text-lg font-bold leading-tight">{card.value}</p>
                   </div>
                 </div>
                 <Sparkline data={sparklineData[card.sparkKey as keyof typeof sparklineData]} colorKey={card.sparkColor} />
@@ -522,6 +539,11 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+      </motion.div>
+
+      {/* Emergency Radar */}
+      <motion.div variants={fadeUp}>
+        <EmergencyRadar />
       </motion.div>
     </motion.div>
   );

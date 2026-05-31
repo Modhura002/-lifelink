@@ -2,7 +2,7 @@
 // LifeLink - TypeScript Type Definitions
 // ============================================================
 
-export type Role = 'PATIENT' | 'DRIVER' | 'HOSPITAL_STAFF' | 'ADMIN';
+export type Role = 'PATIENT' | 'DRIVER' | 'HOSPITAL_STAFF' | 'ADMIN' | 'UNASSIGNED';
 export type BloodGroup = 'A_POS' | 'A_NEG' | 'B_POS' | 'B_NEG' | 'AB_POS' | 'AB_NEG' | 'O_POS' | 'O_NEG';
 export type EmergencyStatusType = 'PENDING' | 'AMBULANCE_ASSIGNED' | 'EN_ROUTE' | 'ARRIVED' | 'ADMITTED' | 'COMPLETED' | 'CANCELLED';
 export type AmbulanceStatusType = 'AVAILABLE' | 'BUSY' | 'EN_ROUTE' | 'RETURNING' | 'OFFLINE';
@@ -31,7 +31,30 @@ export type PageRoute =
   | 'hospital-patients'
   | 'driver-dashboard'
   | 'driver-navigation'
-  | 'emergency-profile';
+  | 'driver-earnings'
+  | 'driver-history'
+  | 'driver-vehicle'
+  | 'hospital-doctors'
+  | 'hospital-pharmacy'
+  | 'hospital-analytics'
+  | 'admin-analytics'
+  | 'admin-settings'
+  | 'admin-reports'
+  | 'doctor-appointments'
+  | 'help'
+  | 'emergency-profile'
+  | 'ai-chat'
+  | 'pharmacy-store'
+  | 'hospital-inventory'
+  | 'admin-appointments'
+  | 'admin-orders'
+  | 'doctor-bookings'
+  | 'order-tracking'
+  | 'insurance'
+  | 'loans'
+  | 'admin-insurance'
+  | 'admin-loans'
+  | 'hospital-scanner';
 
 export interface User {
   id: string;
@@ -43,6 +66,9 @@ export interface User {
   dateOfBirth?: string;
   gender?: string;
   address?: string;
+  city?: string;
+  pinCode?: string;
+  country?: string;
   profileImageUrl?: string;
   isVerified: boolean;
   allergies: string[];
@@ -50,6 +76,10 @@ export interface User {
   chronicConditions: string[];
   emergencyContacts: EmergencyContact[];
   createdAt: string;
+  hospitalId?: string;
+  // Populated by GET /api/users/[id] — not stored in auth store
+  ambulance?: { id: string; vehicleNumber: string; status: string } | null;
+  hospital?: { id: string; name: string; city: string } | null;
 }
 
 export interface EmergencyContact {

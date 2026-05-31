@@ -30,57 +30,93 @@ import { Separator } from '@/components/ui/separator';
 import { useNavigationStore, useEmergencyStore } from '@/store';
 import { DEMO_AMBULANCES, DEMO_HOSPITALS } from '@/lib/mock-data';
 import { getRelativeTime, STATUS_COLORS } from '@/lib/constants';
-import type { TrackingData } from '@/types';
 import MapWrapper from '@/components/ui/MapWrapper';
+import { useSosStatus } from '@/hooks/useSosStatus';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 12 },
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
 };
 
-// Simulated ambulance route waypoints (Delhi area)
-const ROUTE_WAYPOINTS = [
-  { lat: 28.605, lng: 77.200 },
-  { lat: 28.609, lng: 77.203 },
-  { lat: 28.613, lng: 77.207 },
-  { lat: 28.617, lng: 77.210 },
-  { lat: 28.620, lng: 77.214 },
-  { lat: 28.624, lng: 77.218 },
-  { lat: 28.628, lng: 77.222 },
-  { lat: 28.631, lng: 77.225 },
-  { lat: 28.633, lng: 77.228 },
-  { lat: 28.635, lng: 77.230 },
-];
-
-const PATIENT_POS = [ROUTE_WAYPOINTS[0].lat, ROUTE_WAYPOINTS[0].lng] as [number, number];
-const HOSPITAL_POS = [ROUTE_WAYPOINTS[ROUTE_WAYPOINTS.length - 1].lat, ROUTE_WAYPOINTS[ROUTE_WAYPOINTS.length - 1].lng] as [number, number];
+// Build route waypoints dynamically from a given patient location
+function buildRouteWaypoints(patLat: number, patLng: number) {
+  // 10 waypoints heading northeast from the patient position
+  const offsets = [
+    [0, 0],
+    [0.004, 0.003],
+    [0.008, 0.007],
+    [0.012, 0.010],
+    [0.015, 0.014],
+    [0.019, 0.018],
+    [0.023, 0.022],
+    [0.026, 0.025],
+    [0.028, 0.028],
+    [0.030, 0.030],
+  ];
+  return offsets.map(([dLat, dLng]) => ({ lat: patLat + dLat, lng: patLng + dLng }));
+}
 
 export default function TrackingPage() {
   const { setCurrentPage } = useNavigationStore();
   const { activeEmergency, sosActivated, cancelEmergency } = useEmergencyStore();
   const prefersReducedMotion = useReducedMotion();
+  const { toast } = useToast();
+  const router = useRouter();
+
+  // Poll real emergency status from DB
+  const { data: realEmergency } = useSosStatus(activeEmergency?.dbEmergencyId || null);
+
+  // Automatically reset and redirect when the trip is marked COMPLETED by the driver
+  useEffect(() => {
+    if (realEmergency?.status === 'COMPLETED') {
+      cancelEmergency();
+      toast({
+        title: 'Trip Completed',
+        description: 'Your emergency trip has been resolved. Returning to dashboard.',
+      });
+      setCurrentPage('dashboard');
+      router.push('/?page=dashboard');
+    }
+  }, [realEmergency?.status, cancelEmergency, setCurrentPage, router, toast]);
 
   const [waypointIndex, setWaypointIndex] = useState(0);
   const [eta, setEta] = useState(512); // seconds
   const [speed, setSpeed] = useState(42);
   const [distance, setDistance] = useState(3.2);
-  const [ambulancePos, setAmbulancePos] = useState<[number, number]>(PATIENT_POS); // start at patient
   const [shareToast, setShareToast] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const hasActive = sosActivated || activeEmergency !== null;
 
+  // Build route dynamically from the actual patient coordinates
+  const routeWaypoints = activeEmergency
+    ? buildRouteWaypoints(activeEmergency.patientLatitude, activeEmergency.patientLongitude)
+    : buildRouteWaypoints(28.6139, 77.2090);
+
+  const patientPos: [number, number] = [routeWaypoints[0].lat, routeWaypoints[0].lng];
+  const hospitalPos: [number, number] = [
+    routeWaypoints[routeWaypoints.length - 1].lat,
+    routeWaypoints[routeWaypoints.length - 1].lng,
+  ];
+
+  const [ambulancePos, setAmbulancePos] = useState<[number, number]>(patientPos);
+
   // Map waypoint index to visual position
-  const getMapPosition = useCallback((index: number): [number, number] => {
-    return [ROUTE_WAYPOINTS[index].lat, ROUTE_WAYPOINTS[index].lng];
-  }, []);
+  const getMapPosition = useCallback(
+    (index: number): [number, number] => [routeWaypoints[index].lat, routeWaypoints[index].lng],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeEmergency?.patientLatitude, activeEmergency?.patientLongitude]
+  );
 
   useEffect(() => {
     if (!hasActive) return;
 
+    const waypointCount = routeWaypoints.length;
     intervalRef.current = setInterval(() => {
       setWaypointIndex((prev) => {
-        if (prev >= ROUTE_WAYPOINTS.length - 1) return prev;
+        if (prev >= waypointCount - 1) return prev;
         const next = prev + 1;
         setAmbulancePos(getMapPosition(next));
         setEta((e) => Math.max(0, e - 38 + Math.floor(Math.random() * 10)));
@@ -217,10 +253,10 @@ export default function TrackingPage() {
         <MapWrapper
           center={ambulancePos}
           zoom={15}
-          route={ROUTE_WAYPOINTS.map(w => [w.lat, w.lng] as [number, number])}
+          route={routeWaypoints.map(w => [w.lat, w.lng] as [number, number])}
           markers={[
-            { id: 'patient', type: 'patient' as const, position: PATIENT_POS, label: 'Your Location' },
-            { id: 'hospital', type: 'hospital' as const, position: HOSPITAL_POS, label: hospital.name },
+            { id: 'patient', type: 'patient' as const, position: patientPos, label: 'Your Location' },
+            { id: 'hospital', type: 'hospital' as const, position: hospitalPos, label: hospital.name },
             { id: 'ambulance', type: 'ambulance' as const, position: ambulancePos, label: ambulance.vehicleNumber }
           ]}
         />

@@ -20,15 +20,35 @@ import {
   BarChart3,
   Users,
   Truck,
+  Bot,
   LogOut,
   ChevronsLeft,
   ChevronsRight,
   Heart,
   Activity,
+  IndianRupee,
+  History,
+  Car,
+  Stethoscope,
+  Pill,
+  TrendingUp,
+  FileBarChart,
+  Settings,
+  Calendar,
+  HelpCircle,
+  ShoppingBag,
+  PackageOpen,
+  CalendarCheck,
+  CalendarClock,
+  MapPin,
+  ShieldCheck,
+  Banknote,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useNavigationStore, useAuthStore, useUIStore } from '@/store';
+import { useNavigationStore, useUIStore } from '@/store';
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { NAVIGATION_ITEMS } from '@/lib/constants';
 import type { NavItem, PageRoute, Role } from '@/types';
 import { cn } from '@/lib/utils';
@@ -52,20 +72,40 @@ const ICON_MAP: Record<string, React.ElementType> = {
   BarChart3,
   Users,
   Truck,
+  Bot,
+  IndianRupee,
+  History,
+  Car,
+  Stethoscope,
+  Pill,
+  TrendingUp,
+  FileBarChart,
+  Settings,
+  Calendar,
+  HelpCircle,
+  ShoppingBag,
+  PackageOpen,
+  CalendarCheck,
+  CalendarClock,
+  MapPin,
+  ShieldCheck,
+  Banknote,
 };
 
 const ROLE_COLORS: Record<Role, { bg: string; text: string; dot: string }> = {
   PATIENT: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
   DRIVER: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', dot: 'bg-amber-500' },
-  HOSPITAL_STAFF: { bg: 'bg-violet-100 dark:bg-violet-900/30', text: 'text-violet-700 dark:text-violet-400', dot: 'bg-violet-500' },
-  ADMIN: { bg: 'bg-rose-100 dark:bg-rose-900/30', text: 'text-rose-700 dark:text-rose-400', dot: 'bg-rose-500' },
+  HOSPITAL_STAFF: { bg: 'bg-sky-500/10', text: 'text-sky-600 dark:text-sky-400', dot: 'bg-sky-500' },
+  ADMIN: { bg: 'bg-violet-500/10', text: 'text-violet-600 dark:text-violet-400', dot: 'bg-violet-500' },
+  UNASSIGNED: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted' },
 };
 
 const ROLE_LABELS: Record<Role, string> = {
   PATIENT: 'Patient',
   DRIVER: 'Ambulance Driver',
   HOSPITAL_STAFF: 'Hospital Staff',
-  ADMIN: 'Administrator',
+  ADMIN: 'System Admin',
+  UNASSIGNED: 'Unassigned',
 };
 
 const AVATAR_COLORS = [
@@ -118,8 +158,10 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed: controlledCollapsed, onToggle }: SidebarProps) {
   const { currentPage, sidebarOpen, toggleSidebar, setCurrentPage } = useNavigationStore();
-  const { user } = useAuthStore();
+  const { data: session } = useSession();
+  const user = session?.user;
   const unreadCount = useUIStore((s) => s.unreadCount);
+  const router = useRouter();
 
   const isCollapsed = controlledCollapsed ?? !sidebarOpen;
 
@@ -129,20 +171,22 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }: Si
     return categorizeNavItems(items);
   }, [user]);
 
-  const handleLogout = () => {
-    useAuthStore.getState().logout();
+  const handleLogout = async () => {
+    await signOut({ redirect: false });
     useNavigationStore.getState().setCurrentPage('landing');
+    router.push('/');
   };
 
   const handleNavClick = (route: PageRoute) => {
     setCurrentPage(route);
+    router.push(`/?page=${route}`);
   };
 
   if (!user) return null;
 
   const roleColor = ROLE_COLORS[user.role];
-  const avatarColor = getAvatarColor(user.name);
-  const initials = getInitials(user.name);
+  const avatarColor = getAvatarColor(user.name || 'User');
+  const initials = getInitials(user.name || 'U');
 
   return (
     <TooltipProvider delayDuration={0}>

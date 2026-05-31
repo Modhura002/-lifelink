@@ -2,202 +2,150 @@
 
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
-import { Siren, Building2, Navigation, QrCode, Brain, BellRing, ArrowRight } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Siren, Building2, Navigation, QrCode, Brain, BellRing, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface Feature {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-  color: string;
-  bgColor: string;
-  accentColor: string;
-  gradientFrom: string;
-  gradientTo: string;
-  iconGradient: string;
-  decorIcon: React.ElementType;
-}
-
-const features: Feature[] = [
+const features = [
   {
     icon: Siren,
-    title: 'Instant SOS with GPS',
-    description:
-      'One-tap emergency alert instantly shares your precise location with nearby responders and your emergency contacts.',
-    color: 'text-red-500',
-    bgColor: 'bg-red-500/10',
-    accentColor: 'border-t-red-500',
-    gradientFrom: 'from-red-500/[0.03]',
-    gradientTo: 'to-transparent',
-    iconGradient: 'bg-gradient-to-br from-red-500/15 to-red-500/5',
-    decorIcon: Siren,
+    number: '01',
+    title: 'Instant SOS',
+    description: 'One-tap emergency alert shares your GPS with responders and contacts in under 2 seconds.',
+    accent: '#ef4444',
+    glow: 'rgba(239,68,68,0.15)',
   },
   {
     icon: Building2,
-    title: 'Smart Hospital Matching',
-    description:
-      'AI-powered algorithm matches you with the nearest hospital based on specialty, availability, and real-time traffic.',
-    color: 'text-emerald-500',
-    bgColor: 'bg-emerald-500/10',
-    accentColor: 'border-t-emerald-500',
-    gradientFrom: 'from-emerald-500/[0.03]',
-    gradientTo: 'to-transparent',
-    iconGradient: 'bg-gradient-to-br from-emerald-500/15 to-emerald-500/5',
-    decorIcon: Building2,
+    number: '02',
+    title: 'Smart Hospital Match',
+    description: 'AI matches you to the nearest hospital by specialty, real-time availability, and traffic.',
+    accent: '#10b981',
+    glow: 'rgba(16,185,129,0.15)',
   },
   {
     icon: Navigation,
-    title: 'Live Ambulance Tracking',
-    description:
-      'Track your ambulance in real-time on a live map. Know exactly when help arrives — no more anxious waiting.',
-    color: 'text-teal-500',
-    bgColor: 'bg-teal-500/10',
-    accentColor: 'border-t-teal-500',
-    gradientFrom: 'from-teal-500/[0.03]',
-    gradientTo: 'to-transparent',
-    iconGradient: 'bg-gradient-to-br from-teal-500/15 to-teal-500/5',
-    decorIcon: Navigation,
+    number: '03',
+    title: 'Live Tracking',
+    description: 'Real-time ambulance position on a live map — know exactly when help arrives.',
+    accent: '#06b6d4',
+    glow: 'rgba(6,182,212,0.15)',
   },
   {
     icon: QrCode,
-    title: 'Digital Medical QR Card',
-    description:
-      'Your complete medical profile accessible via QR code — blood type, allergies, medications, and emergency contacts.',
-    color: 'text-violet-500',
-    bgColor: 'bg-violet-500/10',
-    accentColor: 'border-t-violet-500',
-    gradientFrom: 'from-violet-500/[0.03]',
-    gradientTo: 'to-transparent',
-    iconGradient: 'bg-gradient-to-br from-violet-500/15 to-violet-500/5',
-    decorIcon: QrCode,
+    number: '04',
+    title: 'Medical QR Card',
+    description: 'Blood type, allergies, medications — your full profile accessible via one QR scan.',
+    accent: '#8b5cf6',
+    glow: 'rgba(139,92,246,0.15)',
   },
   {
     icon: Brain,
-    title: 'AI Triage Assessment',
-    description:
-      'Answer a few quick questions and our AI assesses severity to prioritize and route your emergency appropriately.',
-    color: 'text-amber-500',
-    bgColor: 'bg-amber-500/10',
-    accentColor: 'border-t-amber-500',
-    gradientFrom: 'from-amber-500/[0.03]',
-    gradientTo: 'to-transparent',
-    iconGradient: 'bg-gradient-to-br from-amber-500/15 to-amber-500/5',
-    decorIcon: Brain,
+    number: '05',
+    title: 'AI Triage',
+    description: 'Instant severity assessment routes your emergency to the right resources automatically.',
+    accent: '#f59e0b',
+    glow: 'rgba(245,158,11,0.15)',
   },
   {
     icon: BellRing,
-    title: 'Family Alerts & Updates',
-    description:
-      'Your loved ones receive real-time notifications with your location, hospital ETA, and status updates automatically.',
-    color: 'text-rose-500',
-    bgColor: 'bg-rose-500/10',
-    accentColor: 'border-t-rose-500',
-    gradientFrom: 'from-rose-500/[0.03]',
-    gradientTo: 'to-transparent',
-    iconGradient: 'bg-gradient-to-br from-rose-500/15 to-rose-500/5',
-    decorIcon: BellRing,
+    number: '06',
+    title: 'Family Alerts',
+    description: 'Loved ones get live updates: location, hospital ETA, and status — all automatic.',
+    accent: '#ec4899',
+    glow: 'rgba(236,72,153,0.15)',
   },
 ];
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 30 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: 'easeOut' as const },
-  },
-};
-
 export default function Features() {
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-100px' });
+  const isInView = useInView(ref, { once: true, margin: '-80px' });
 
   return (
-    <section id="features" className="relative py-24 sm:py-32">
-      {/* Section header */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section id="features" className="relative py-24 sm:py-32 bg-background">
+      {/* Faint grid */}
+      <svg className="absolute inset-0 w-full h-full opacity-[0.025] dark:opacity-[0.04] pointer-events-none">
+        <defs>
+          <pattern id="feat-grid" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+            <path d="M 60 0 L 0 0 0 60" fill="none" stroke="currentColor" strokeWidth="0.5"/>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#feat-grid)" />
+      </svg>
+
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Section header */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="mx-auto max-w-2xl text-center"
+          transition={{ duration: 0.6 }}
+          className="mb-20 text-center"
         >
-          <span className="inline-block rounded-full bg-emergency/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-emergency">
-            Features
+          <span className="inline-block rounded-full border border-emergency/30 bg-emergency/10 px-5 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-emergency mb-6">
+            Built for Emergencies
           </span>
-          <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-            Everything You Need in an{' '}
-            <span className="gradient-text">Emergency</span>
+          <h2 className="font-black tracking-tight" style={{ fontSize: 'clamp(2.2rem, 5vw, 4rem)', lineHeight: 1.05 }}>
+            Everything you need
+            <br />
+            <span className="gradient-text">when seconds count.</span>
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            From the moment you press SOS to the moment you receive care, LifeLink
-            orchestrates every step seamlessly.
+          <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto">
+            Six precision-engineered features that orchestrate every moment from SOS tap to hospital admission.
           </p>
         </motion.div>
 
-        {/* Feature cards grid */}
-        <motion.div
-          ref={ref}
-          variants={containerVariants}
-          initial="hidden"
-          animate={isInView ? 'visible' : 'hidden'}
-          className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          {features.map((feature) => (
-            <motion.div key={feature.title} variants={cardVariants}>
-              <Card className={cn(
-                'card-hover-feature group h-full border-t-2 border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden',
-                feature.accentColor
-              )}>
-                {/* Subtle gradient background */}
-                <div className={cn(
-                  'absolute inset-0 bg-gradient-to-b pointer-events-none',
-                  feature.gradientFrom,
-                  feature.gradientTo
-                )} />
-                <CardContent className="relative p-6">
-                  {/* Decorative element top-right */}
-                  <feature.decorIcon className={cn(
-                    'absolute top-4 right-4 size-8 opacity-[0.06] transition-opacity group-hover:opacity-[0.12]',
-                    feature.color
-                  )} />
+        {/* Feature grid */}
+        <div ref={ref} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-border/60 rounded-2xl overflow-hidden border border-border/60">
+          {features.map((f, i) => (
+            <motion.div
+              key={f.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.5, delay: i * 0.08 }}
+              whileHover={{ scale: 1.02, zIndex: 10 }}
+              style={{ perspective: 900 }}
+              className="relative group bg-card"
+            >
+              {/* Hover glow */}
+              <motion.div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400 pointer-events-none rounded-none"
+                style={{ background: `radial-gradient(circle at 30% 30%, ${f.glow}, transparent 65%)` }}
+              />
 
-                  {/* Icon with gradient container */}
-                  <div
-                    className={cn(
-                      'mb-4 flex h-12 w-12 items-center justify-center rounded-xl transition-transform group-hover:scale-110',
-                      feature.iconGradient
-                    )}
+              <div className="relative p-7 h-full flex flex-col">
+                {/* Number + icon row */}
+                <div className="flex items-start justify-between mb-5">
+                  <span className="font-black text-5xl tabular-nums leading-none" style={{ color: `${f.accent}18`, WebkitTextStroke: `1px ${f.accent}30` }}>
+                    {f.number}
+                  </span>
+                  <motion.div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm"
+                    style={{ background: `${f.accent}15`, border: `1px solid ${f.accent}25` }}
+                    whileHover={{ scale: 1.15, rotate: 5 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 15 }}
                   >
-                    <feature.icon className={cn('size-6', feature.color)} />
-                  </div>
-                  <h3 className="mb-2 text-lg font-semibold">{feature.title}</h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {feature.description}
-                  </p>
+                    <f.icon className="w-5 h-5" style={{ color: f.accent }} />
+                  </motion.div>
+                </div>
 
-                  {/* Learn more link */}
-                  <div className="mt-4 flex items-center gap-1 text-xs font-medium text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                    <span>Learn more</span>
-                    <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                </CardContent>
-              </Card>
+                <h3 className="text-lg font-bold mb-2 group-hover:text-foreground transition-colors">{f.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed flex-1">{f.description}</p>
+
+                {/* Arrow link */}
+                <div className="mt-5 flex items-center gap-1 text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{ color: f.accent }}>
+                  <span>Learn more</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </div>
+
+                {/* Bottom accent line */}
+                <motion.div
+                  className="absolute bottom-0 left-0 h-[2px] w-0 group-hover:w-full transition-all duration-300 rounded-b"
+                  style={{ background: `linear-gradient(90deg, ${f.accent}, transparent)` }}
+                />
+              </div>
             </motion.div>
           ))}
-        </motion.div>
+        </div>
       </div>
     </section>
   );

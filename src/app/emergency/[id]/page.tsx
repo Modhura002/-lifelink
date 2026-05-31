@@ -4,7 +4,6 @@ import {
   Heart, Droplets, Phone, User, ShieldAlert, AlertTriangle,
   Pill, Activity, CreditCard,
 } from 'lucide-react';
-import { DEMO_PATIENTS } from '@/lib/mock-data';
 import { BLOOD_GROUP_LABELS } from '@/lib/constants';
 
 const MOCK_EXTENDED = {
@@ -26,11 +25,40 @@ function calculateAge(dob: string): number {
   return age;
 }
 
-import { use } from 'react';
+import { use, useEffect, useState } from 'react';
 
 export default function EmergencyProfileRoute({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const patient = DEMO_PATIENTS.find((p) => p.id === resolvedParams.id) ?? DEMO_PATIENTS[0];
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/users/${resolvedParams.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setProfile(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [resolvedParams.id]);
+
+  if (loading) {
+    return <div style={{ padding: 40, textAlign: 'center', fontFamily: 'sans-serif' }}>Loading emergency data...</div>;
+  }
+
+  if (!profile || profile.error) {
+    return <div style={{ padding: 40, textAlign: 'center', fontFamily: 'sans-serif' }}>Profile not found or access denied.</div>;
+  }
+
+  const patient = {
+    ...profile,
+    bloodGroup: profile?.patientProfile?.bloodGroup || 'O_POS',
+    allergies: profile?.patientProfile?.allergies ? JSON.parse(profile.patientProfile.allergies) : [],
+    chronicConditions: profile?.patientProfile?.chronicConditions ? JSON.parse(profile.patientProfile.chronicConditions) : [],
+    currentMedications: profile?.patientProfile?.currentMedications ? JSON.parse(profile.patientProfile.currentMedications) : [],
+    emergencyContacts: profile?.emergencyContacts || [],
+  };
+
   const bloodLabel = BLOOD_GROUP_LABELS[patient.bloodGroup || 'O_POS'];
   const age = patient.dateOfBirth ? calculateAge(patient.dateOfBirth) : null;
 

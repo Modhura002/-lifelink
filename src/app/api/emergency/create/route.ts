@@ -1,49 +1,88 @@
 import { NextResponse } from 'next/server';
-import { DEMO_AMBULANCES, DEMO_HOSPITALS } from '@/lib/mock-data';
+import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const prisma = globalForPrisma.prisma ?? new PrismaClient();
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { patientId, latitude, longitude, severity, description } = body;
 
-    // Validate required fields
     if (!patientId || latitude === undefined || longitude === undefined || !severity) {
-      return NextResponse.json(
-        { error: 'Missing required fields: patientId, latitude, longitude, severity' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
-
-    // Validate severity range
     if (severity < 1 || severity > 5) {
-      return NextResponse.json(
-        { error: 'Severity must be between 1 and 5' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Severity must be 1-5' }, { status: 400 });
     }
 
-    // Validate coordinates
-    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-      return NextResponse.json(
-        { error: 'latitude and longitude must be numbers' },
-        { status: 400 }
-      );
+    // Find nearest available ambulance
+    const ambulances = await prisma.ambulance.findMany({ where: { status: 'AVAILABLE' } });
+    const nearest = ambulances.sort((a, b) =>
+      haversine(latitude, longitude, a.currentLatitude, a.currentLongitude) -
+      haversine(latitude, longitude, b.currentLatitude, b.currentLongitude)
+    )[0] ?? ambulances[0];
+
+    if (!nearest) {
+      return NextResponse.json({ error: 'No ambulances available' }, { status: 503 });
     }
 
-    // Find nearest available ambulance (mock - just pick first available)
-    const nearest = DEMO_AMBULANCES.find((a) => a.status === 'AVAILABLE') || DEMO_AMBULANCES[0];
+    // Find nearest hospital with available beds
+    const hospitals = await prisma.hospital.findMany({ where: { isActive: true, availableBeds: { gt: 0 } } });
+    const nearestHospital = hospitals.sort((a, b) =>
+      haversine(latitude, longitude, a.latitude, a.longitude) -
+      haversine(latitude, longitude, b.latitude, b.longitude)
+    )[0];
 
-    // Find nearest hospital (mock - pick AIIMS New Delhi)
-    const nearestHospital = DEMO_HOSPITALS[2];
+    const now = new Date().toISOString();
 
-    // Generate request ID
-    const requestId = `ER-${Date.now().toString(36).toUpperCase()}`;
+    const emergency = await prisma.emergencyRequest.create({
+      data: {
+        patientId,
+        ambulanceId: nearest.id,
+        hospitalId: nearestHospital?.id ?? null,
+        status: 'AMBULANCE_ASSIGNED',
+        severity,
+        description: description ?? null,
+        patientLatitude: latitude,
+        patientLongitude: longitude,
+        timeline: {
+          create: [
+            { event: 'SOS Triggered', description: `Severity Level ${severity}`, timestamp: now },
+            { event: 'Ambulance Assigned', description: `${nearest.vehicleNumber} dispatched`, timestamp: now },
+          ],
+        },
+      },
+      include: { ambulance: true, hospital: true, timeline: true },
+    });
+
+    // Mark ambulance as en route
+    await prisma.ambulance.update({ where: { id: nearest.id }, data: { status: 'EN_ROUTE' } });
+
+    // Create notification for patient
+    await prisma.notification.create({
+      data: {
+        userId: patientId,
+        type: 'AMBULANCE',
+        title: 'Ambulance Dispatched',
+        message: `${nearest.driverName} is heading to you in ${nearest.vehicleNumber}. ETA ~8 minutes.`,
+      },
+    });
 
     return NextResponse.json({
-      requestId,
-      status: 'PENDING',
-      severity,
-      description: description || null,
+      requestId: emergency.id,
+      status: emergency.status,
+      severity: emergency.severity,
+      description: emergency.description,
       ambulance: {
         id: nearest.id,
         driverName: nearest.driverName,
@@ -52,7 +91,7 @@ export async function POST(request: Request) {
         currentLatitude: nearest.currentLatitude,
         currentLongitude: nearest.currentLongitude,
       },
-      hospital: {
+      hospital: nearestHospital ? {
         id: nearestHospital.id,
         name: nearestHospital.name,
         address: nearestHospital.address,
@@ -60,14 +99,12 @@ export async function POST(request: Request) {
         phone: nearestHospital.phone,
         availableBeds: nearestHospital.availableBeds,
         icuAvailable: nearestHospital.icuAvailable,
-      },
-      estimatedETA: 480, // 8 minutes in seconds
-      createdAt: new Date().toISOString(),
+      } : null,
+      estimatedETA: 480,
+      createdAt: emergency.createdAt.toISOString(),
     });
-  } catch {
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error('Create emergency error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,19 +8,247 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  image         String?
+  phone         String?
+  role          String    @default("UNASSIGNED")
+  authProvider  String    @default("CREDENTIALS")
+  isVerified    Boolean   @default(false)
+  city          String?   // For city-scoped SOS broadcast
+  pinCode       String?   // Added for precise routing
+  country       String?   // Added for precise routing
+  driverStatus  String    @default("AVAILABLE") // AVAILABLE, ON_DUTY, OFFLINE
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // NextAuth
+  accounts Account[]
+  sessions Session[]
+
+  // Profiles
+  patientProfile PatientProfile?
+  driverProfile  DriverProfile?
+  staffProfile   StaffProfile?
+  adminProfile   AdminProfile?
+
+  // Existing Relations
+  emergencyContacts EmergencyContact[]
+  medicalRecords    MedicalRecord[]
+  notifications     Notification[]
+  emergencies       EmergencyRequest[] @relation("PatientEmergencies")
+  driverEmergencies EmergencyRequest[] @relation("DriverEmergencies")
+  ambulance         Ambulance?
+  hospital          Hospital?          @relation(fields: [hospitalId], references: [id])
+  hospitalId        String?
+
+  // Scans
+  scansAsDoctor ScanLog[] @relation("DoctorScans")
+  scansAsPatient ScanLog[] @relation("PatientScans")
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model PatientProfile {
+  id                 String  @id @default(cuid())
+  userId             String  @unique
+  qrCodeId           String? @unique // Added for short manual entry
+  age                Int?
+  gender             String?
+  dateOfBirth        String?
+  height             Float?
+  weight             Float?
+  bloodGroup         String?
+  allergies          String  @default("[]")
+  existingDiseases   String  @default("[]")
+  chronicConditions  String  @default("[]")
+  currentMedications String  @default("[]")
+  pastSurgeries      String  @default("[]") // Added for QR scanner
+  notes              String? // Added for QR scanner
+  insuranceDetails   String?
+  organDonorStatus   Boolean @default(false)
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model DriverProfile {
+  id                   String  @id @default(cuid())
+  userId               String  @unique
+  licenseNumber        String
+  licenseExpiry        String?
+  experience           String?
+  certificationDetails String?
+  status               String  @default("AVAILABLE")
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StaffProfile {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  department  String?
+  designation String?
+  employeeId  String?
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminProfile {
+  id               String  @id @default(cuid())
+  userId           String  @unique
+  organizationName String?
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmergencyContact {
+  id           String @id @default(cuid())
+  userId       String
+  name         String
+  relationship String
+  phone        String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Hospital {
+  id              String   @id @default(cuid())
+  name            String
+  address         String
+  city            String
+  latitude        Float
+  longitude       Float
+  phone           String
+  email           String
+  totalBeds       Int      @default(100)
+  availableBeds   Int      @default(20)
+  icuTotal        Int      @default(10)
+  icuAvailable    Int      @default(3)
+  emergencyRating Float    @default(4.5)
+  isActive        Boolean  @default(true)
+  specializations String   @default("[]")
+  createdAt       DateTime @default(now())
+
+  staff       User[]
+  ambulances  Ambulance[]
+  emergencies EmergencyRequest[]
+}
+
+model Ambulance {
+  id               String   @id @default(cuid())
+  vehicleNumber    String   @unique
+  driverName       String
+  driverPhone      String
+  status           String   @default("AVAILABLE")
+  currentLatitude  Float    @default(28.6139)
+  currentLongitude Float    @default(77.209)
+  hospitalId       String?
+  driverId         String?  @unique
+  createdAt        DateTime @default(now())
+
+  hospital    Hospital?          @relation(fields: [hospitalId], references: [id])
+  driver      User?              @relation(fields: [driverId], references: [id])
+  emergencies EmergencyRequest[]
+}
+
+model EmergencyRequest {
+  id               String    @id @default(cuid())
+  patientId        String
+  ambulanceId      String?
+  hospitalId       String?
+  assignedDriverId String?   // Driver who accepted the SOS broadcast
+  status           String    @default("PENDING")
+  severity         Int       @default(1)
+  description      String?
+  city             String    @default("Unknown") // For city-scoped SSE broadcast
+  pinCode          String?   // For precise matching
+  country          String?   // For region matching
+  matchTier        Int?      // Tier used for matching (1, 2, 3, 4)
+  patientLatitude  Float
+  patientLongitude Float
+  assignedAt       DateTime? // When driver accepted
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  patient        User                @relation("PatientEmergencies", fields: [patientId], references: [id])
+  assignedDriver User?               @relation("DriverEmergencies", fields: [assignedDriverId], references: [id])
+  ambulance      Ambulance?          @relation(fields: [ambulanceId], references: [id])
+  hospital       Hospital?           @relation(fields: [hospitalId], references: [id])
+  timeline       EmergencyTimeline[]
+}
+
+model EmergencyTimeline {
+  id          String           @id @default(cuid())
+  emergencyId String
+  event       String
+  description String?
+  timestamp   String
+  emergency   EmergencyRequest @relation(fields: [emergencyId], references: [id], onDelete: Cascade)
+}
+
+model MedicalRecord {
+  id           String   @id @default(cuid())
+  patientId    String
+  type         String
+  title        String
+  description  String?
+  date         String
+  doctorName   String?
+  hospitalName String?
+  fileUrl      String?
+  createdAt    DateTime @default(now())
+  patient      User     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   @default("SYSTEM")
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model ScanLog {
+  id          String   @id @default(cuid())
+  doctorId    String
+  doctor      User     @relation("DoctorScans", fields: [doctorId], references: [id])
+  patientId   String
+  patient     User     @relation("PatientScans", fields: [patientId], references: [id])
+  scannedAt   DateTime @default(now())
+  method      String   // 'QR' or 'MANUAL'
+}
+

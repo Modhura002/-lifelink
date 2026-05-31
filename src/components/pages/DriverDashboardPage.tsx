@@ -38,9 +38,17 @@ import {
   SEVERITY_LABELS,
 } from '@/lib/mock-data';
 import { STATUS_COLORS, getRelativeTime } from '@/lib/constants';
-import { useNavigationStore, useEmergencyStore } from '@/store';
+import { useNavigationStore, useEmergencyStore, useDriverAssignmentStore } from '@/store';
+import type { DriverAssignment } from '@/store';
 import { useToast } from '@/hooks/use-toast';
 import { BLOOD_GROUP_LABELS } from '@/lib/constants';
+import DashboardHero from '@/components/dashboard/DashboardHero';
+import { useSosStream } from '@/hooks/useSosStream';
+import SosAlertCard from '@/components/driver/SosAlertCard';
+import LocationOnboardingModal from '@/components/driver/LocationOnboardingModal';
+import { useRouter } from 'next/navigation';
+import { useGeolocation } from '@/hooks/useGeolocation';
+import { useSession } from 'next-auth/react';
 
 /* ──────────────────────────────────────────────
    Animation variants
@@ -87,76 +95,129 @@ const DRIVER_STATS = {
    ────────────────────────────────────────────── */
 export default function DriverDashboardPage() {
   const [isOnline, setIsOnline] = useState(true);
-  const [incomingCountdown, setIncomingCountdown] = useState(30);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
-  // Emergency store — cross-tab sync
-  const { activeEmergency: incomingEmergency, acceptEmergency, rejectEmergency, markArrived } = useEmergencyStore();
-  const isIncoming = incomingEmergency?.status === 'WAITING_FOR_DRIVER' && isOnline;
-
-  const prevIsIncoming = useRef(isIncoming);
-  useEffect(() => {
-    if (prevIsIncoming.current && !isIncoming && incomingEmergency === null) {
-      toast({ title: 'Emergency Cancelled', description: 'The patient has cancelled the emergency request.', variant: 'destructive' });
-    }
-    prevIsIncoming.current = isIncoming;
-  }, [isIncoming, incomingEmergency, toast]);
-
-  // Countdown timer for incoming emergency
-  useEffect(() => {
-    if (isIncoming) {
-      setIncomingCountdown(30);
-      countdownRef.current = setInterval(() => {
-        setIncomingCountdown((prev) => {
-          if (prev <= 1) {
-            // Auto-decline
-            rejectEmergency();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current);
-        countdownRef.current = null;
-      }
-    }
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
-  }, [isIncoming, rejectEmergency]);
-
+  // Zustand stores
+  const { markArrived } = useEmergencyStore();
+  const { setAssignment } = useDriverAssignmentStore();
   const setCurrentPage = useNavigationStore((s) => s.setCurrentPage);
+  const geo = useGeolocation();
+  const { data: session } = useSession();
 
-  const handleAccept = useCallback(() => {
-    acceptEmergency('amb-1');
-    setCurrentPage('driver-navigation');
-  }, [acceptEmergency, setCurrentPage]);
+  const driverName = session?.user?.name || 'Driver';
+  const driverInitials = driverName.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
 
-  const handleDecline = useCallback(() => {
-    rejectEmergency();
-  }, [rejectEmergency]);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [driverInfo, setDriverInfo] = useState<{ pinCode: string | null; city: string | null; country: string | null }>({ pinCode: null, city: null, country: null });
 
-  /* Active assignment — first EN_ROUTE or ARRIVED emergency */
-  const activeAssignment = useMemo(() => {
-    if (incomingEmergency && incomingEmergency.status !== 'WAITING_FOR_DRIVER') {
-      return {
-        id: incomingEmergency.requestId,
-        patientId: DEMO_PATIENTS[0].id,
-        hospitalId: incomingEmergency.hospitalId || DEMO_HOSPITALS[2].id,
-        ambulanceId: incomingEmergency.ambulanceId || 'amb-1',
-        status: incomingEmergency.status as any,
-        severity: incomingEmergency.severity,
-        createdAt: incomingEmergency.startedAt,
-        timeline: incomingEmergency.timeline
-      };
+  const toggleStatus = async (checked: boolean) => {
+    try {
+      const newStatus = checked ? 'AVAILABLE' : 'OFFLINE';
+      const res = await fetch('/api/driver/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverStatus: newStatus }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setIsOnline(checked);
+      toast({ title: 'Status Updated', description: `You are now ${checked ? 'Online' : 'Offline'}.` });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Could not change status.', variant: 'destructive' });
     }
+  };
+
+  // SSE broadcast stream — only when driver is online
+  const { pendingAlerts, dismissAlert } = useSosStream({
+    isOnline,
+    onAssigned: (emergencyId) => {
+      toast({
+        title: 'Patient Assigned',
+        description: 'A patient has been assigned an ambulance by another driver.',
+      });
+    },
+    onSetupRequired: () => {
+      setShowLocationModal(true);
+    },
+    onDriverInfo: (info) => {
+      setDriverInfo(info);
+    }
+  });
+
+  // Accept handler — calls real API, atomic Prisma transaction
+  const handleAccept = useCallback(async (emergencyId: string, matchTier: number | null) => {
+    setAcceptingId(emergencyId);
+    try {
+      const res = await fetch('/api/driver/accept-emergency', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emergencyId, matchTier }),
+      });
+
+      if (res.status === 409) {
+        toast({
+          title: 'Already Assigned',
+          description: 'Another driver accepted this emergency first.',
+          variant: 'destructive',
+        });
+        dismissAlert(emergencyId);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      const data = await res.json();
+      const em = data.emergency;
+
+      // Store real assignment for DriverNavigationPage
+      setAssignment({
+        emergencyId: em.id,
+        status: em.status,
+        severity: em.severity,
+        city: em.city,
+        description: em.description,
+        latitude: em.latitude,
+        longitude: em.longitude,
+        assignedAt: em.assignedAt,
+        patient: em.patient,
+        timeline: em.timeline,
+      });
+
+      dismissAlert(emergencyId);
+
+      toast({
+        title: '✅ Emergency Accepted',
+        description: `Navigating to ${em.patient?.name ?? 'patient'} in ${em.city}.`,
+      });
+
+      // Navigate to navigation page
+      setCurrentPage('driver-navigation');
+      router.push('/?page=driver-navigation');
+    } catch (err) {
+      console.error('Accept error:', err);
+      toast({
+        title: 'Accept Failed',
+        description: 'Could not accept emergency. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAcceptingId(null);
+    }
+  }, [dismissAlert, setAssignment, setCurrentPage, router, toast]);
+
+  const handleDecline = useCallback((emergencyId: string) => {
+    dismissAlert(emergencyId);
+  }, [dismissAlert]);
+
+  /* Active assignment — check Zustand store (set on SOS accept) */
+  const activeAssignment = useMemo(() => {
     return DEMO_EMERGENCIES.find(
       (e) => e.status === 'EN_ROUTE' || e.status === 'AMBULANCE_ASSIGNED' || e.status === 'ARRIVED'
     ) ?? null;
-  }, [incomingEmergency]);
+  }, []);
 
   /* Recent (non-active) assignments */
   const recentAssignments = useMemo(
@@ -226,147 +287,49 @@ export default function DriverDashboardPage() {
     s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
   return (
-    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5 p-4 md:p-6 pb-12">
-      {/* ──── Incoming Emergency Popup ──── */}
-      <AnimatePresence>
-        {isIncoming && incomingEmergency && (
-          <motion.div
-            key="incoming-emergency"
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-          >
-            <Card className="overflow-hidden border-2 border-red-500/50 shadow-[0_0_30px_oklch(0.55_0.24_27/0.3)]">
-              <CardContent className="p-0">
-                {/* Urgent header bar */}
-                <motion.div
-                  className="bg-gradient-to-r from-red-600 via-red-500 to-orange-500 px-5 py-3 flex items-center justify-between"
-                  animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-                  style={{ backgroundSize: '200% 200%' }}
-                >
-                  <div className="flex items-center gap-2">
-                    <motion.div
-                      animate={{ rotate: [0, -15, 15, -15, 0] }}
-                      transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 1 }}
-                    >
-                      <Siren className="h-5 w-5 text-white" />
-                    </motion.div>
-                    <span className="text-white font-bold text-sm tracking-wider uppercase">Incoming Emergency</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <motion.div
-                      className="w-2.5 h-2.5 rounded-full bg-white"
-                      animate={{ opacity: [1, 0.3, 1] }}
-                      transition={{ duration: 0.8, repeat: Infinity }}
-                    />
-                    <span className="text-white/90 font-mono font-bold text-lg">{incomingCountdown}s</span>
-                  </div>
-                </motion.div>
+    <>
+      <LocationOnboardingModal
+        open={showLocationModal}
+        initialData={driverInfo}
+        onClose={() => setShowLocationModal(false)}
+        onSuccess={(data) => {
+          setDriverInfo(data);
+          setShowLocationModal(false);
+        }}
+      />
+      
+      <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5 p-4 md:p-6 pb-12">
 
-                {/* Emergency details */}
-                <div className="p-5 space-y-4 bg-gradient-to-b from-red-950/20 to-transparent">
-                  {/* Patient Info */}
-                  <div className="flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-full bg-red-500/20 border-2 border-red-500/40 flex items-center justify-center">
-                      <span className="text-red-400 font-bold text-lg">
-                        {(incomingEmergency.patientName ?? 'U').split(' ').map((n: string) => n[0]).join('')}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-lg">{incomingEmergency.patientName ?? 'Unknown Patient'}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge className={`${
-                          SEVERITY_LABELS[incomingEmergency.severity]?.bgColor ?? 'bg-red-900/30'
-                        } ${
-                          SEVERITY_LABELS[incomingEmergency.severity]?.color ?? 'text-red-400'
-                        } border-0 text-[10px] font-bold px-2`}>
-                          SEV {incomingEmergency.severity} — {SEVERITY_LABELS[incomingEmergency.severity]?.label ?? 'CRITICAL'}
-                        </Badge>
-                        {incomingEmergency.patientBloodGroup && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                            {BLOOD_GROUP_LABELS[incomingEmergency.patientBloodGroup] ?? incomingEmergency.patientBloodGroup}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  {incomingEmergency.description && (
-                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
-                      <p className="text-xs text-zinc-400">
-                        <AlertTriangle className="w-3 h-3 inline mr-1 text-amber-400" />
-                        {incomingEmergency.description}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Location & Distance */}
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4 text-red-400" />
-                      <span>New Delhi, India</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Route className="h-4 w-4 text-sky-400" />
-                      <span className="font-medium text-sky-400">~3.2 km away</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Timer className="h-4 w-4 text-amber-400" />
-                      <span>ETA ~8 min</span>
-                    </div>
-                  </div>
-
-                  {/* Countdown progress bar */}
-                  <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-gradient-to-r from-red-500 to-orange-500 rounded-full"
-                      initial={{ width: '100%' }}
-                      animate={{ width: `${(incomingCountdown / 30) * 100}%` }}
-                      transition={{ duration: 0.5 }}
-                    />
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={handleAccept}
-                      size="lg"
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base py-6 shadow-lg shadow-emerald-500/20 gap-2 border-0"
-                    >
-                      <CheckCircle2 className="h-5 w-5" />
-                      Accept
-                    </Button>
-                    <Button
-                      onClick={handleDecline}
-                      size="lg"
-                      variant="outline"
-                      className="flex-1 border-red-600/40 text-red-400 hover:bg-red-950/30 hover:text-red-300 font-bold text-base py-6 gap-2"
-                    >
-                      <XCircle className="h-5 w-5" />
-                      Decline
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+        {/* ──── Real-time SOS Alert Cards from SSE stream ──── */}
+        <AnimatePresence mode="sync">
+        {pendingAlerts.map((alert) => (
+          <SosAlertCard
+            key={alert.emergencyId}
+            alert={alert}
+            onAccept={handleAccept}
+            onDecline={handleDecline}
+            countdownSeconds={30}
+            isAccepting={acceptingId === alert.emergencyId}
+          />
+        ))}
       </AnimatePresence>
 
-      {/* ──── Page Title ──── */}
-      <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words">Driver Dashboard</h1>
-          <p className="text-muted-foreground mt-1 break-words text-sm sm:text-base">Manage your assignments and track performance</p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Signal className="h-4 w-4" />
-          <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-        </div>
-      </motion.div>
+      {/* ──── Hero Header ──── */}
+      <DashboardHero
+        greeting="On Duty"
+        name={driverName}
+        subtitle={`${isOnline ? '🟢 Online · Ready for dispatch' : '🔴 Offline · Go online to accept emergencies'} · ${new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' })}`}
+        gradient="linear-gradient(135deg, #431407 0%, #c2410c 50%, #0f172a 100%)"
+        accentColor="rgba(249,115,22,0.35)"
+        icon={<Ambulance className="w-6 h-6 text-orange-300" />}
+        badge="Ambulance Driver"
+        stats={[
+          { value: String(DRIVER_STATS.todayTrips), label: "Today's trips" },
+          { value: `${DRIVER_STATS.totalDistance} km`, label: 'Distance covered' },
+          { value: DRIVER_STATS.avgResponseTime, label: 'Avg response' },
+          { value: String(DRIVER_STATS.rating), label: 'Rating ⭐' },
+        ]}
+      />
 
       {/* ──── 1. Header Card: Driver Profile ──── */}
       <motion.div variants={fadeUp}>
@@ -380,12 +343,12 @@ export default function DriverDashboardPage() {
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     <div className="h-14 w-14 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-emerald-500/20">
-                      RK
+                      {driverInitials}
                     </div>
                     <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-background bg-emerald-500" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold">Rajesh Kumar</h2>
+                    <h2 className="text-lg font-semibold">{driverName}</h2>
                     <div className="flex items-center gap-2 mt-0.5">
                       <Ambulance className="h-3.5 w-3.5 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">DL-01-EM-0012</span>
@@ -395,6 +358,17 @@ export default function DriverDashboardPage() {
                         <Shield className="h-2.5 w-2.5 mr-1 text-emerald-500" />
                         Verified Driver
                       </Badge>
+                      {driverInfo.pinCode && (
+                        <div className="flex items-center text-xs text-muted-foreground ml-2">
+                          📍 PIN: {driverInfo.pinCode} · {driverInfo.city} · {driverInfo.country}
+                          <button 
+                            onClick={() => setShowLocationModal(true)}
+                            className="ml-2 text-emerald-500 hover:underline"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -404,7 +378,7 @@ export default function DriverDashboardPage() {
                     <div className={`h-2.5 w-2.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
                     <span className="text-sm font-medium">{isOnline ? 'Online' : 'Offline'}</span>
                   </div>
-                  <Switch checked={isOnline} onCheckedChange={setIsOnline} />
+                  <Switch checked={isOnline} onCheckedChange={toggleStatus} />
                 </div>
               </div>
             </div>
@@ -413,7 +387,7 @@ export default function DriverDashboardPage() {
       </motion.div>
 
       {/* ──── 2. Stats Row ──── */}
-      <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+      <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           {
             label: "Today's Trips",
@@ -452,24 +426,97 @@ export default function DriverDashboardPage() {
             iconBg: 'bg-amber-100 dark:bg-amber-900/40 text-amber-500',
           },
         ].map((stat) => (
-          <Card key={stat.label} className="card-hover overflow-hidden">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-start justify-between min-w-0 gap-1">
-                <div className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center shrink-0 ${stat.iconBg}`}>
-                  {stat.icon}
+          <motion.div
+            key={stat.label}
+            whileHover={{
+              scale: 1.05,
+              rotateX: -4,
+              rotateY: 4,
+              z: 20,
+              transition: { type: 'spring', stiffness: 400, damping: 20 },
+            }}
+            style={{ perspective: 800, transformStyle: 'preserve-3d' }}
+          >
+            <Card className="card-hover shadow-sm hover:shadow-lg transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${stat.iconBg}`}>
+                    {stat.icon}
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                    {trendIcon(stat.trend)}
+                    {stat.trend}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 font-medium whitespace-nowrap">
-                  {trendIcon(stat.trend)}
-                  {stat.trend}
+                <div className="mt-3">
+                  <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
                 </div>
-              </div>
-              <div className="mt-2 sm:mt-3 min-w-0">
-                <p className="text-lg sm:text-2xl font-bold tracking-tight truncate">{stat.value}</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 break-words line-clamp-1">{stat.label}</p>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
+      </motion.div>
+
+      {/* ──── Service Area Card ──── */}
+      <motion.div variants={fadeUp}>
+        <Card className="card-shine overflow-hidden">
+          <CardContent className="p-0">
+            <div className="h-1.5 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-600" />
+            <div className="p-5 md:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded-lg bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center">
+                    <MapPin className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Service Area</h3>
+                    <p className="text-[10px] text-muted-foreground">SOS alerts are matched to your service area</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs gap-1.5"
+                  onClick={() => setShowLocationModal(true)}
+                >
+                  <MapPin className="h-3 w-3" />
+                  Update Area
+                </Button>
+              </div>
+
+              {driverInfo.pinCode ? (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mb-1">PIN Code</p>
+                    <p className="text-sm font-bold text-sky-500">{driverInfo.pinCode}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mb-1">City</p>
+                    <p className="text-sm font-bold capitalize">{driverInfo.city}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3 text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mb-1">Country</p>
+                    <p className="text-sm font-bold capitalize">{driverInfo.country}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 text-center">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-amber-400">Service area not configured</p>
+                  <p className="text-xs text-muted-foreground mt-1">Set your PIN code, city, and country to receive nearby SOS alerts.</p>
+                  <Button
+                    size="sm"
+                    className="mt-3 bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                    onClick={() => setShowLocationModal(true)}
+                  >
+                    Set Up Now
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
 
       {/* ──── 3. Current Assignment Card ──── */}
@@ -806,6 +853,7 @@ export default function DriverDashboardPage() {
           </Card>
         </motion.div>
       </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
 }

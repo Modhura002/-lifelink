@@ -1,268 +1,370 @@
 'use client';
 
-import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
-import { useRef, useState } from 'react';
-import { Phone, Play, Shield, HeartPulse, Activity } from 'lucide-react';
+import { motion, useScroll, useTransform, useMotionValue, useSpring, useReducedMotion } from 'framer-motion';
+import { useRef, useState, useCallback } from 'react';
+import { Phone, Shield, HeartPulse, Activity, ArrowDown, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigationStore } from '@/store';
 import DemoModal from '@/components/landing/DemoModal';
+import ParticleCanvas from '@/components/landing/ParticleCanvas';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.15,
-      delayChildren: 0.2,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 30 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: 'easeOut' as const },
-  },
-};
-
-const stats = [
-  { value: '50,000+', label: 'Lives Saved' },
-  { value: '200+', label: 'Hospitals' },
-  { value: '<4min', label: 'Avg Response' },
+/* ── Marquee ticker ─────────────────────────────────────────────────────────── */
+const TICKER_ITEMS = [
+  '🚑 Ambulance dispatched in 47s — Mumbai',
+  '✅ Patient admitted at AIIMS — Delhi',
+  '🏥 4 beds cleared — Bangalore',
+  '⚡ 3.8 min average response time',
+  '🚑 Ambulance en route — Chennai',
+  '✅ Emergency resolved — Pune',
+  '❤️ 50,000+ lives saved this year',
+  '🛡️ HIPAA compliant & encrypted',
 ];
 
-/* Typing text animation words */
-const HERO_WORDS = ['Never Alone.', 'Connected.', 'Protected.', 'Safe.'];
-
-function TypingText() {
-  const prefersReducedMotion = useReducedMotion();
-
+function Marquee() {
+  const items = [...TICKER_ITEMS, ...TICKER_ITEMS];
   return (
-    <span className="inline-flex items-center">
-      {!prefersReducedMotion ? (
-        <>
-          {HERO_WORDS.map((word, i) => (
-            <motion.span
-              key={word}
-              className="gradient-text inline-block"
-              initial={{ opacity: 0, y: 20, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              transition={{
-                duration: 0.5,
-                delay: 0.6 + i * 0.3,
-                ease: 'easeOut',
-              }}
-            >
-              {word}
-              {i < HERO_WORDS.length - 1 && (
-                <motion.span
-                  className="inline-block w-[2px] h-[1em] bg-white/60 ml-0.5 align-middle"
-                  animate={{ opacity: [1, 0] }}
-                  transition={{ duration: 0.4, delay: 0.6 + i * 0.3 + 0.25, repeat: 1 }}
-                />
-              )}
-            </motion.span>
-          ))}
-        </>
-      ) : (
-        <span className="gradient-text">Never Alone.</span>
-      )}
-    </span>
+    <div className="relative overflow-hidden border-t border-white/10 bg-white/[0.03] py-2.5">
+      <motion.div
+        className="flex gap-12 whitespace-nowrap"
+        animate={{ x: ['0%', '-50%'] }}
+        transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+      >
+        {items.map((item, i) => (
+          <span key={i} className="text-xs font-medium text-white/50 flex items-center gap-12">
+            {item}
+            <span className="text-white/20">◆</span>
+          </span>
+        ))}
+      </motion.div>
+    </div>
   );
 }
 
+/* ── Floating orbs background ────────────────────────────────────────────────── */
+function AmbientOrbs() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {/* Primary orb — blue */}
+      <motion.div
+        className="absolute rounded-full blur-[120px]"
+        style={{ width: 600, height: 600, left: '-10%', top: '-20%', background: 'radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%)' }}
+        animate={{ x: [0, 40, 0], y: [0, 30, 0], scale: [1, 1.1, 1] }}
+        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      {/* Secondary orb — red/emergency */}
+      <motion.div
+        className="absolute rounded-full blur-[140px]"
+        style={{ width: 500, height: 500, right: '-5%', top: '10%', background: 'radial-gradient(circle, rgba(239,68,68,0.18) 0%, transparent 70%)' }}
+        animate={{ x: [0, -30, 0], y: [0, 50, 0], scale: [1, 1.15, 1] }}
+        transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
+      />
+      {/* Tertiary orb — purple */}
+      <motion.div
+        className="absolute rounded-full blur-[100px]"
+        style={{ width: 400, height: 400, left: '40%', bottom: '5%', background: 'radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%)' }}
+        animate={{ x: [0, 20, 0], y: [0, -20, 0], scale: [1, 1.08, 1] }}
+        transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut', delay: 6 }}
+      />
+      {/* Grid */}
+      <svg className="absolute inset-0 w-full h-full" style={{ opacity: 0.04 }}>
+        <defs>
+          <pattern id="hero-grid" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
+            <path d="M 80 0 L 0 0 0 80" fill="none" stroke="white" strokeWidth="0.5" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#hero-grid)" />
+      </svg>
+    </div>
+  );
+}
+
+/* ── Animated EKG line across hero ─────────────────────────────────────────── */
+function EKGDecor() {
+  return (
+    <div className="absolute bottom-32 left-0 right-0 overflow-hidden opacity-[0.12] pointer-events-none">
+      <svg viewBox="0 0 1440 80" preserveAspectRatio="none" className="w-full h-16">
+        <motion.path
+          d="M0,40 L120,40 L150,40 L165,10 L180,70 L195,5 L210,75 L225,40 L240,40 L360,40 L390,40 L405,10 L420,70 L435,5 L450,75 L465,40 L480,40 L600,40 L630,40 L645,10 L660,70 L675,5 L690,75 L705,40 L720,40 L840,40 L870,40 L885,10 L900,70 L915,5 L930,75 L945,40 L960,40 L1080,40 L1110,40 L1125,10 L1140,70 L1155,5 L1170,75 L1185,40 L1200,40 L1320,40 L1350,40 L1365,10 L1380,70 L1395,5 L1410,75 L1425,40 L1440,40"
+          fill="none"
+          stroke="white"
+          strokeWidth="2"
+          strokeLinecap="round"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ duration: 3, ease: 'easeInOut', delay: 1 }}
+        />
+      </svg>
+    </div>
+  );
+}
+
+/* ── Hero stats ─────────────────────────────────────────────────────────────── */
+const HERO_STATS = [
+  { value: '50K+', label: 'Lives Saved' },
+  { value: '200+', label: 'Hospitals' },
+  { value: '<4 min', label: 'Avg Response' },
+  { value: '99.9%', label: 'Uptime' },
+];
+
+/* ── Main component ─────────────────────────────────────────────────────────── */
 export default function Hero() {
   const sectionRef = useRef<HTMLElement>(null);
+  const phoneRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const [showDemo, setShowDemo] = useState(false);
 
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ['start start', 'end start'],
-  });
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [14, -14]), { stiffness: 200, damping: 30 });
+  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-14, 14]), { stiffness: 200, damping: 30 });
 
-  const parallaxY = useTransform(scrollYProgress, [0, 1], [0, prefersReducedMotion ? 0 : 150]);
-  const parallaxOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (prefersReducedMotion || !phoneRef.current) return;
+    const rect = phoneRef.current.getBoundingClientRect();
+    mouseX.set((e.clientX - rect.left) / rect.width - 0.5);
+    mouseY.set((e.clientY - rect.top) / rect.height - 0.5);
+  }, [prefersReducedMotion, mouseX, mouseY]);
+
+  const handleMouseLeave = useCallback(() => { mouseX.set(0); mouseY.set(0); }, [mouseX, mouseY]);
+
+  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ['start start', 'end start'] });
+  const parallaxY = useTransform(scrollYProgress, [0, 1], [0, prefersReducedMotion ? 0 : 180]);
+  const textParallax = useTransform(scrollYProgress, [0, 0.5], [0, prefersReducedMotion ? 0 : -60]);
 
   return (
-    <section
-      id="home"
-      ref={sectionRef}
-      className="relative min-h-screen overflow-hidden hero-gradient pt-16"
-    >
-      {/* Background grid pattern */}
-      <div className="absolute inset-0 opacity-[0.03]">
-        <div
-          className="h-full w-full"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
-            backgroundSize: '60px 60px',
-          }}
-        />
-      </div>
+    <section ref={sectionRef} className="relative min-h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #050810 0%, #0a0e1a 40%, #0c0814 100%)' }}>
+      <ParticleCanvas />
+      <AmbientOrbs />
+      <EKGDecor />
 
       <motion.div
-        className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
-        style={{ y: parallaxY, opacity: parallaxOpacity }}
+        className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
+        style={{ y: parallaxY }}
       >
-        <div className="flex min-h-[calc(100dvh-4rem)] flex-col items-center justify-center gap-12 lg:flex-row lg:gap-16">
-          {/* Left Content */}
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="flex max-w-2xl flex-1 flex-col items-center text-center lg:items-start lg:text-left"
-          >
-            {/* Tag line */}
-            <motion.div variants={itemVariants}>
-              <span className="inline-flex items-center gap-2 rounded-full border border-emergency/30 bg-emergency/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-emergency">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emergency opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emergency" />
-                </span>
-                Emergency Response &bull; Reimagined
-              </span>
-            </motion.div>
+        <div className="flex min-h-screen flex-col items-center justify-center pt-20 pb-16">
 
-            {/* Main Headline with typing/reveal animation */}
+          {/* ── Top badge ── */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="mb-8"
+          >
+            <span className="inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-5 py-2 text-xs font-bold uppercase tracking-[0.2em] text-red-400">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+              </span>
+              Emergency Response · Reimagined
+            </span>
+          </motion.div>
+
+          {/* ── Massive headline ── */}
+          <motion.div
+            style={{ y: textParallax }}
+            className="text-center max-w-5xl mx-auto"
+          >
             <motion.h1
-              variants={itemVariants}
-              className="mt-6 text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight text-white break-words"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.4, 0.25, 1] }}
+              className="font-black leading-[0.9] tracking-tight text-white"
+              style={{ fontSize: 'clamp(3.5rem, 9vw, 8rem)' }}
             >
-              Every Second Matters.{' '}
-              <TypingText />
+              EVERY
+              <br />
+              <span
+                style={{
+                  background: 'linear-gradient(135deg, #ef4444 0%, #ec4899 40%, #8b5cf6 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
+                SECOND
+              </span>
+              <br />
+              MATTERS.
             </motion.h1>
 
-            {/* Subtext */}
             <motion.p
-              variants={itemVariants}
-              className="mt-6 max-w-lg text-lg leading-relaxed text-white/70 sm:text-xl"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.5 }}
+              className="mt-8 text-lg sm:text-xl text-white/50 max-w-xl mx-auto leading-relaxed"
             >
-              One-tap SOS with instant GPS tracking, smart hospital matching, and real-time
-              ambulance coordination — all from your phone.
+              One tap. GPS precision. Smart hospital matching. Real-time ambulance tracking.
+              <br className="hidden sm:block" />
+              <span className="text-white/70">Life-saving technology in your pocket.</span>
             </motion.p>
+          </motion.div>
 
-            {/* CTA Buttons */}
-            <motion.div
-              variants={itemVariants}
-              className="mt-8 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center w-full sm:w-auto gap-4"
-            >
+          {/* ── CTA row ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
+            className="mt-10 flex flex-col sm:flex-row items-center gap-4"
+          >
+            <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
               <Button
                 size="lg"
-                className="w-full sm:w-auto bg-emergency hover:bg-emergency/90 text-emergency-foreground h-12 px-6 sm:px-8 text-base font-semibold shadow-lg shadow-emergency/25"
+                className="h-14 px-10 text-base font-black tracking-wide shadow-2xl shadow-red-500/30 border-0"
+                style={{ background: 'linear-gradient(135deg, #ef4444, #ec4899)', color: 'white' }}
                 onClick={() => useNavigationStore.getState().setCurrentPage('signup')}
               >
                 <Phone className="size-5" />
-                Get Emergency Card
+                Get Emergency Card Free
               </Button>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full sm:w-auto h-12 border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white px-6 sm:px-8 text-base font-semibold"
+                className="h-14 px-8 text-base font-semibold border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white hover:border-white/40 backdrop-blur-sm"
                 onClick={() => setShowDemo(true)}
               >
-                <Play className="size-5" />
+                <Play className="size-4" />
                 Watch Demo
               </Button>
             </motion.div>
+          </motion.div>
 
-            {/* Trust badges */}
-            <motion.div
-              variants={itemVariants}
-              className="mt-8 flex items-center gap-6 text-sm text-white/50"
-            >
-              <div className="flex items-center gap-2">
-                <Shield className="size-4" />
-                <span>HIPAA Compliant</span>
+          {/* ── Trust badges ── */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.9 }}
+            className="mt-6 flex items-center gap-6 text-xs text-white/30 font-medium"
+          >
+            <div className="flex items-center gap-1.5"><Shield className="size-3.5 text-white/20" />HIPAA Compliant</div>
+            <div className="w-px h-4 bg-white/10" />
+            <div className="flex items-center gap-1.5"><HeartPulse className="size-3.5 text-white/20" />24/7 Active</div>
+            <div className="w-px h-4 bg-white/10" />
+            <div className="flex items-center gap-1.5"><Activity className="size-3.5 text-white/20" />Real-time</div>
+          </motion.div>
+
+          {/* ── 3D Phone + stats grid ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 60 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.6, ease: [0.25, 0.4, 0.25, 1] }}
+            className="mt-16 w-full max-w-4xl mx-auto"
+          >
+            <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
+
+              {/* Phone mockup */}
+              <motion.div
+                ref={phoneRef}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+                className="relative flex items-center justify-center cursor-pointer"
+                style={{ perspective: 1000 }}
+              >
+                <motion.div style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }} className="relative">
+                  {/* Glow behind phone */}
+                  <div className="absolute -inset-8 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.25) 0%, transparent 70%)' }} />
+
+                  {/* SOS rings */}
+                  {[0, 0.7, 1.4].map((delay, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute inset-0 rounded-full border border-red-500/30"
+                      style={{ transform: 'translate(-50%,-50%)', top: '50%', left: '50%', width: 300, height: 300, borderRadius: '50%' }}
+                      animate={{ scale: [1, 2.5], opacity: [0.4, 0] }}
+                      transition={{ duration: 2.5, repeat: Infinity, delay, ease: 'easeOut' }}
+                    />
+                  ))}
+
+                  {/* Phone frame */}
+                  <div className="relative z-10 w-52 h-96 sm:w-60 sm:h-[28rem] rounded-[2.5rem] overflow-hidden"
+                    style={{ background: 'linear-gradient(160deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06) inset' }}
+                  >
+                    {/* Notch */}
+                    <div className="mx-auto mt-4 w-24 h-6 rounded-full bg-black/60" />
+                    {/* Screen content */}
+                    <div className="flex flex-col items-center justify-center mt-8 gap-4 px-4">
+                      <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold">LifeLink</p>
+
+                      {/* SOS button */}
+                      <motion.div
+                        className="relative flex items-center justify-center w-32 h-32 rounded-full"
+                        style={{ background: 'linear-gradient(135deg, #dc2626, #ef4444)', boxShadow: '0 0 40px rgba(239,68,68,0.6), 0 0 80px rgba(239,68,68,0.2)' }}
+                        animate={{ boxShadow: ['0 0 40px rgba(239,68,68,0.5)', '0 0 60px rgba(239,68,68,0.8)', '0 0 40px rgba(239,68,68,0.5)'] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <span className="text-4xl font-black text-white tracking-wider">SOS</span>
+                      </motion.div>
+
+                      <p className="text-[10px] text-white/50 font-medium">Hold 2s for Emergency</p>
+
+                      {/* Status bar */}
+                      <div className="mt-2 flex items-center gap-2 rounded-full px-3 py-1.5" style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                        <motion.div className="w-1.5 h-1.5 rounded-full bg-emerald-400" animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
+                        <span className="text-[9px] text-emerald-400 font-semibold">GPS Active · 108 Ready</span>
+                      </div>
+
+                      {/* Mini info */}
+                      <div className="w-full mt-2 rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                        <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1.5">Your Emergency Profile</p>
+                        <div className="flex gap-2 flex-wrap">
+                          {['O+', 'Penicillin ⚠', 'Metformin'].map((t) => (
+                            <span key={t} className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/60">{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Bottom bar */}
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-16 h-1 rounded-full bg-white/20" />
+                  </div>
+                </motion.div>
+              </motion.div>
+
+              {/* Stats grid */}
+              <div className="flex-1 grid grid-cols-2 gap-4 w-full lg:w-auto">
+                {HERO_STATS.map((s, i) => (
+                  <motion.div
+                    key={s.label}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.8 + i * 0.1, duration: 0.5 }}
+                    whileHover={{ scale: 1.05, rotateX: -3, rotateY: 3 }}
+                    style={{ perspective: 600, transformStyle: 'preserve-3d' }}
+                    className="rounded-2xl p-5 text-center cursor-default"
+                  >
+                    <div
+                      className="rounded-2xl p-5 text-center"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    >
+                      <div className="text-3xl sm:text-4xl font-black text-white">{s.value}</div>
+                      <div className="text-xs text-white/40 font-medium mt-1 uppercase tracking-wider">{s.label}</div>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-              <div className="flex items-center gap-2">
-                <HeartPulse className="size-4" />
-                <span>24/7 Active</span>
-              </div>
-              <div className="hidden sm:flex items-center gap-2">
-                <Activity className="size-4" />
-                <span>Real-time</span>
-              </div>
+            </div>
+          </motion.div>
+
+          {/* Scroll indicator */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5, duration: 0.5 }}
+            className="mt-12 flex flex-col items-center gap-2"
+          >
+            <span className="text-[10px] uppercase tracking-[0.3em] text-white/25 font-semibold">Scroll</span>
+            <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
+              <ArrowDown className="w-4 h-4 text-white/20" />
             </motion.div>
           </motion.div>
-
-          {/* Right - Phone Mockup with SOS */}
-          <motion.div
-            initial={prefersReducedMotion ? {} : { opacity: 0, scale: 0.8, x: 50 }}
-            animate={{ opacity: 1, scale: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.4, ease: 'easeOut' }}
-            className="relative flex flex-1 items-center justify-center"
-          >
-            <div className="relative">
-              {/* SOS Pulse Rings */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="sos-ring-1 absolute h-64 w-64 rounded-full border-2 border-emergency/40" />
-                <div className="sos-ring-2 absolute h-64 w-64 rounded-full border-2 border-emergency/30" />
-                <div className="sos-ring-3 absolute h-64 w-64 rounded-full border-2 border-emergency/20" />
-              </div>
-
-              {/* Phone frame */}
-              <div className="relative z-10 flex h-72 w-44 flex-col items-center rounded-[2rem] border border-white/20 bg-white/10 p-3 backdrop-blur-sm sm:h-80 sm:w-48">
-                {/* Phone notch */}
-                <div className="h-6 w-20 rounded-full bg-black/40" />
-
-                {/* Phone screen content */}
-                <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-3">
-                  {/* SOS Button */}
-                  <div className="sos-glow flex h-24 w-24 items-center justify-center rounded-full bg-emergency shadow-2xl">
-                    <span className="text-3xl font-black tracking-wider text-white">
-                      SOS
-                    </span>
-                  </div>
-                  <p className="text-xs font-medium text-white/80">
-                    Tap for Emergency Help
-                  </p>
-
-                  {/* Mini status */}
-                  <div className="mt-2 flex items-center gap-2 rounded-full bg-white/10 px-3 py-1">
-                    <span className="relative flex h-2 w-2">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
-                    </span>
-                    <span className="text-[10px] text-white/70">GPS Active</span>
-                  </div>
-                </div>
-
-                {/* Phone bottom bar */}
-                <div className="mb-1 h-1 w-12 rounded-full bg-white/30" />
-              </div>
-            </div>
-          </motion.div>
         </div>
-
-        {/* Stats Bar */}
-        <motion.div
-          initial={prefersReducedMotion ? {} : { opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-          className="pb-12"
-        >
-          <div className="mx-auto max-w-2xl rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              {stats.map((stat, i) => (
-                <div key={i} className="flex flex-col gap-1">
-                  <span className="text-2xl font-bold text-white sm:text-3xl">
-                    {stat.value}
-                  </span>
-                  <span className="text-xs font-medium uppercase tracking-wider text-white/50">
-                    {stat.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </motion.div>
       </motion.div>
 
-      {/* Demo Modal */}
+      {/* Marquee at absolute bottom */}
+      <div className="absolute bottom-0 left-0 right-0 z-10">
+        <Marquee />
+      </div>
+
       <DemoModal open={showDemo} onClose={() => setShowDemo(false)} />
     </section>
   );

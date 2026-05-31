@@ -1,6 +1,7 @@
 'use client';
+import { useSession } from 'next-auth/react';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
@@ -17,7 +18,6 @@ import {
   Trash2,
   Lock,
   AlertTriangle,
-  CreditCard,
   CheckCircle2,
   Contact,
   UserCircle,
@@ -26,13 +26,20 @@ import {
   Activity,
   Building2,
   Clock,
+  Stethoscope,
+  Truck,
+  BadgeCheck,
+  Car,
+  KeyRound,
+  Users,
+  Tag,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Select,
@@ -52,10 +59,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { useAuthStore } from '@/store';
-import { DEMO_PATIENTS } from '@/lib/mock-data';
+import { useNavigationStore } from '@/store';
 import { BLOOD_GROUP_LABELS } from '@/lib/constants';
-import type { EmergencyContact, InsuranceInfo } from '@/types';
+import type { EmergencyContact, BloodGroup, User as UserType } from '@/types';
 import { toast } from 'sonner';
 
 const stagger = {
@@ -64,73 +70,57 @@ const stagger = {
 };
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.38, ease: 'easeOut' as const } },
 };
 
-const BLOOD_OPTIONS = Object.entries(BLOOD_GROUP_LABELS).map(([key, label]) => ({
-  value: key,
-  label,
-}));
+const BLOOD_OPTIONS = Object.entries(BLOOD_GROUP_LABELS).map(([k, v]) => ({ value: k, label: v }));
 
-// Activity timeline data
-const ACTIVITY_TIMELINE = [
-  { id: '1', event: 'Profile photo updated', time: '2 days ago', icon: Camera, color: 'text-violet-500', bgColor: 'bg-violet-50 dark:bg-violet-950/40' },
-  { id: '2', event: 'Emergency contact added', time: '1 week ago', icon: Contact, color: 'text-emerald-500', bgColor: 'bg-emerald-50 dark:bg-emerald-950/40' },
-  { id: '3', event: 'Medical records uploaded', time: '2 weeks ago', icon: FileDown, color: 'text-sky-500', bgColor: 'bg-sky-50 dark:bg-sky-950/40' },
-  { id: '4', event: 'Insurance card linked', time: '3 weeks ago', icon: CreditCard, color: 'text-amber-500', bgColor: 'bg-amber-50 dark:bg-amber-950/40' },
-  { id: '5', event: 'Account created', time: 'Jan 15, 2024', icon: UserCircle, color: 'text-primary', bgColor: 'bg-primary/10' },
-];
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function parseExtra(address?: string | null): Record<string, string> {
+  if (!address) return {};
+  try {
+    const p = JSON.parse(address);
+    if (typeof p === 'object' && p !== null) return p as Record<string, string>;
+  } catch {}
+  return {};
+}
 
-// Circular progress ring component
-function CompletionRing({ percentage }: { percentage: number }) {
-  const radius = 40;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (percentage / 100) * circumference;
+function isJSONAddress(address?: string | null): boolean {
+  if (!address) return false;
+  try { JSON.parse(address); return true; } catch { return false; }
+}
 
-  const colorClass =
-    percentage >= 80
-      ? 'text-emerald-500'
-      : percentage >= 50
-        ? 'text-amber-500'
-        : 'text-red-500';
+const ROLE_LABELS: Record<string, string> = {
+  PATIENT: 'Patient',
+  DRIVER: 'Ambulance Driver',
+  HOSPITAL_STAFF: 'Hospital Staff',
+  ADMIN: 'Administrator',
+};
 
+const ROLE_COLORS: Record<string, string> = {
+  PATIENT: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+  DRIVER: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+  HOSPITAL_STAFF: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400',
+  ADMIN: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400',
+};
+
+// ── Profile Completion Ring ───────────────────────────────────────────────────
+function CompletionRing({ pct }: { pct: number }) {
+  const r = 40;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
+  const color = pct >= 80 ? 'text-emerald-500' : pct >= 50 ? 'text-amber-500' : 'text-red-500';
   return (
     <div className="relative w-24 h-24">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-        {/* Background circle */}
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="8"
-          className="text-muted/50"
-        />
-        {/* Progress circle */}
-        <motion.circle
-          cx="50"
-          cy="50"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset }}
-          transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
-          className={colorClass}
-        />
+        <circle cx="50" cy="50" r={r} fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/50" />
+        <motion.circle cx="50" cy="50" r={r} fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round"
+          strokeDasharray={circ} initial={{ strokeDashoffset: circ }} animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }} className={color} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span
-          className="text-lg font-bold"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-        >
-          {percentage}%
+        <motion.span className="text-lg font-bold" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}>
+          {pct}%
         </motion.span>
         <span className="text-[9px] text-muted-foreground">Complete</span>
       </div>
@@ -138,131 +128,329 @@ function CompletionRing({ percentage }: { percentage: number }) {
   );
 }
 
-export default function ProfilePage() {
-  const { user, updateProfile } = useAuthStore();
-  const patient = DEMO_PATIENTS[0];
+// ── Tag Pill editor ───────────────────────────────────────────────────────────
+function TagList({ tags, onRemove, onAdd, placeholder }: { tags: string[]; onRemove: (t: string) => void; onAdd: (t: string) => void; placeholder?: string }) {
+  const [val, setVal] = useState('');
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {tags.map((t) => (
+          <span key={t} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary border border-primary/20">
+            {t}
+            <button onClick={() => onRemove(t)} className="hover:text-destructive transition-colors"><X className="h-2.5 w-2.5" /></button>
+          </span>
+        ))}
+        {tags.length === 0 && <span className="text-xs text-muted-foreground italic">None listed</span>}
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={val} onChange={(e) => setVal(e.target.value)} placeholder={placeholder || 'Add item…'}
+          className="h-7 text-xs" onKeyDown={(e) => { if (e.key === 'Enter' && val.trim()) { onAdd(val.trim()); setVal(''); } }}
+        />
+        <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={() => { if (val.trim()) { onAdd(val.trim()); setVal(''); } }}>
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
-  // Profile form state
+// ── Main Component ────────────────────────────────────────────────────────────
+export default function ProfilePage() {
+  const { data: session } = useSession();
+  
+  const storeUser = session?.user;
+  const updateProfile = (u: any) => {}; // TODO: implement update profile api
+  const { setCurrentPage } = useNavigationStore();
+
+  // Live user state (starts with store user, refreshed from API)
+  const [profile, setProfile] = useState<UserType | null>(storeUser as UserType | null);
+  const [loading, setLoading] = useState(false);
+
+  // Refresh from DB on mount
+  useEffect(() => {
+    if (!storeUser?.id) return;
+    setLoading(true);
+    fetch(`/api/users/${storeUser.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.error) {
+          setProfile(data);
+          updateProfile(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [storeUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const p = profile ?? storeUser;
+  if (!p) return null;
+
+  return <ProfileContent profile={p as UserType} setProfile={setProfile} updateProfile={updateProfile} setCurrentPage={setCurrentPage} loading={loading} />;
+}
+
+function ProfileContent({
+  profile,
+  setProfile,
+  updateProfile,
+  setCurrentPage,
+  loading,
+}: {
+  profile: UserType;
+  setProfile: (u: UserType) => void;
+  updateProfile: (u: Partial<UserType>) => void;
+  setCurrentPage: (p: import('@/types').PageRoute) => void;
+  loading: boolean;
+}) {
+  // ── Personal form state ───────────────────────────────────────────────────
   const [editing, setEditing] = useState(false);
+  const extra = useMemo(() => parseExtra(profile.address), [profile.address]);
+  const plainAddress = isJSONAddress(profile.address) ? '' : (profile.address || '');
+
   const [form, setForm] = useState({
-    name: patient.name,
-    email: patient.email,
-    phone: patient.phone,
-    bloodGroup: patient.bloodGroup || 'O_POS',
-    dateOfBirth: patient.dateOfBirth || '',
-    gender: patient.gender || 'Male',
-    address: patient.address || '',
+    name: profile.name,
+    phone: profile.phone,
+    gender: profile.gender || '',
+    dateOfBirth: profile.dateOfBirth || '',
+    address: plainAddress,
   });
 
-  // Emergency contacts
-  const [contacts, setContacts] = useState<EmergencyContact[]>(patient.emergencyContacts);
+  // Keep form in sync if profile changes (fresh fetch)
+  useEffect(() => {
+    setForm({
+      name: profile.name,
+      phone: profile.phone,
+      gender: profile.gender || '',
+      dateOfBirth: profile.dateOfBirth || '',
+      address: isJSONAddress(profile.address) ? '' : (profile.address || ''),
+    });
+  }, [profile.id]); // only re-sync when user changes, not on every save
+
+  // ── Medical form (PATIENT only) ───────────────────────────────────────────
+  const [medEditing, setMedEditing] = useState(false);
+  const pp = (profile as any).patientProfile || {};
+  const [medForm, setMedForm] = useState({
+    bloodGroup: pp.bloodGroup || '',
+    allergies: pp.allergies ? JSON.parse(pp.allergies) : [],
+    currentMedications: pp.currentMedications ? JSON.parse(pp.currentMedications) : [],
+    chronicConditions: pp.chronicConditions ? JSON.parse(pp.chronicConditions) : [],
+  });
+
+  // ── Emergency contacts ────────────────────────────────────────────────────
+  const [contacts, setContacts] = useState<EmergencyContact[]>(profile.emergencyContacts || []);
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', relationship: '', phone: '' });
+  const [savingContact, setSavingContact] = useState(false);
 
-  // Insurance
-  const [insurance] = useState<InsuranceInfo>({
-    id: 'ins-1',
-    userId: patient.id,
-    provider: 'Star Health Insurance',
-    policyNumber: 'SHI-2024-785432',
-    validUntil: '2025-12-31',
-    coverageType: 'Comprehensive',
+  // ── Service Area form (DRIVER only) ───────────────────────────────────────────
+  const [serviceAreaEditing, setServiceAreaEditing] = useState(false);
+  const [serviceAreaForm, setServiceAreaForm] = useState({
+    city: profile.city || '',
+    pinCode: profile.pinCode || '',
+    country: profile.country || '',
   });
 
-  // Calculate profile completion percentage
-  const profileCompletion = useMemo(() => {
-    const fields = [
-      form.name,
-      form.email,
-      form.phone,
-      form.bloodGroup,
-      form.dateOfBirth,
-      form.gender,
-      form.address,
-      contacts.length > 0 ? 'filled' : '',
-      insurance.policyNumber ? 'filled' : '',
-    ];
-    const filled = fields.filter((f) => f && f.trim() !== '').length;
-    return Math.round((filled / fields.length) * 100);
-  }, [form, contacts.length, insurance.policyNumber]);
+  useEffect(() => {
+    setServiceAreaForm({
+      city: profile.city || '',
+      pinCode: profile.pinCode || '',
+      country: profile.country || '',
+    });
+  }, [profile.id, profile.city, profile.pinCode, profile.country]);
 
-  const isInsuranceExpiringSoon = useMemo(() => {
-    const validDate = new Date(insurance.validUntil);
-    const now = new Date();
-    const diffMs = validDate.getTime() - now.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    return diffDays < 90;
-  }, [insurance.validUntil]);
-
-  const handleSave = () => {
-    updateProfile({
+  // ── Save personal info ────────────────────────────────────────────────────
+  const handleSave = async () => {
+    const updates: Partial<UserType> = {
       name: form.name,
       phone: form.phone,
-      bloodGroup: form.bloodGroup as 'A_POS',
-      dateOfBirth: form.dateOfBirth,
-      gender: form.gender,
-      address: form.address,
-    });
+      gender: form.gender || undefined,
+      dateOfBirth: form.dateOfBirth || undefined,
+    };
+    // Only update address for roles that use plain string addresses
+    if (!isJSONAddress(profile.address)) {
+      updates.address = form.address;
+    }
+
+    const next = { ...profile, ...updates };
+    setProfile(next);
+    updateProfile(updates);
+
+    if (profile.id) {
+      await fetch(`/api/users/${profile.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }).catch(() => {});
+    }
+    toast.success('Profile updated');
     setEditing(false);
   };
 
-  const handleAddContact = () => {
-    if (!newContact.name || !newContact.phone) return;
-    const contact: EmergencyContact = {
-      id: `ec-${Date.now()}`,
-      userId: patient.id,
-      ...newContact,
+  // ── Save medical info ─────────────────────────────────────────────────────
+  const handleSaveMedical = async () => {
+    const updates: Partial<UserType> = {
+      bloodGroup: medForm.bloodGroup as BloodGroup,
+      allergies: medForm.allergies,
+      currentMedications: medForm.currentMedications,
+      chronicConditions: medForm.chronicConditions,
     };
-    setContacts([...contacts, contact]);
-    setNewContact({ name: '', relationship: '', phone: '' });
-    setShowAddContact(false);
+    const next = { ...profile, ...updates };
+    setProfile(next);
+    updateProfile(updates);
+
+    if (profile.id) {
+      await fetch(`/api/users/${profile.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }).catch(() => {});
+    }
+    toast.success('Medical info updated');
+    setMedEditing(false);
   };
 
-  const handleRemoveContact = (id: string) => {
-    setContacts(contacts.filter((c) => c.id !== id));
+  // ── Save Service Area ─────────────────────────────────────────────────────
+  const handleSaveServiceArea = async () => {
+    const updates: Partial<UserType> = {
+      city: serviceAreaForm.city,
+      pinCode: serviceAreaForm.pinCode,
+      country: serviceAreaForm.country,
+    };
+    const next = { ...profile, ...updates };
+    setProfile(next);
+    updateProfile(updates);
+
+    if (profile.id) {
+      await fetch(`/api/users/${profile.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }).catch(() => {});
+    }
+    toast.success('Service area updated');
+    setServiceAreaEditing(false);
   };
 
-  const handleDownloadHealthSummary = () => {
-    toast.success('Health summary PDF generated!');
+  // ── Emergency contact management ──────────────────────────────────────────
+  const handleAddContact = async () => {
+    if (!newContact.name || !newContact.phone) return;
+    setSavingContact(true);
+    try {
+      const res = await fetch(`/api/users/${profile.id}/emergency-contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newContact),
+      });
+      const contact: EmergencyContact = await res.json();
+      const updated = [...contacts, contact];
+      setContacts(updated);
+      updateProfile({ emergencyContacts: updated });
+      setNewContact({ name: '', relationship: '', phone: '' });
+      setShowAddContact(false);
+      toast.success('Emergency contact added');
+    } catch {
+      toast.error('Failed to add contact');
+    } finally {
+      setSavingContact(false);
+    }
   };
+
+  const handleRemoveContact = async (id: string) => {
+    await fetch(`/api/users/${profile.id}/emergency-contacts/${id}`, { method: 'DELETE' }).catch(() => {});
+    const updated = contacts.filter((c) => c.id !== id);
+    setContacts(updated);
+    updateProfile({ emergencyContacts: updated });
+    toast.success('Contact removed');
+  };
+
+  // ── Profile completion ────────────────────────────────────────────────────
+  const completionFields = useMemo(() => {
+    const base = [
+      { label: 'Full Name', filled: !!profile.name },
+      { label: 'Email', filled: !!profile.email },
+      { label: 'Phone', filled: !!profile.phone },
+      { label: 'Gender', filled: !!profile.gender },
+      { label: 'Date of Birth', filled: !!profile.dateOfBirth },
+    ];
+    if (profile.role === 'PATIENT') {
+      base.push(
+        { label: 'Blood Group', filled: !!profile.bloodGroup },
+        { label: 'Address', filled: !!plainAddress },
+        { label: 'Emergency Contact', filled: contacts.length > 0 },
+        { label: 'Medical History', filled: (profile.allergies?.length ?? 0) > 0 || (profile.chronicConditions?.length ?? 0) > 0 },
+      );
+    } else if (profile.role === 'DRIVER') {
+      base.push(
+        { label: 'License Number', filled: !!extra.licenseNumber },
+        { label: 'Experience', filled: !!extra.experience },
+      );
+    } else if (profile.role === 'HOSPITAL_STAFF') {
+      base.push(
+        { label: 'Department', filled: !!extra.department },
+        { label: 'Employee ID', filled: !!extra.employeeId },
+      );
+    }
+    return base;
+  }, [profile, plainAddress, contacts.length, extra]);
+
+  const completionPct = Math.round((completionFields.filter((f) => f.filled).length / completionFields.length) * 100);
+
+  // ── Role icon ─────────────────────────────────────────────────────────────
+  const RoleIcon = profile.role === 'PATIENT' ? Heart
+    : profile.role === 'DRIVER' ? Truck
+    : profile.role === 'HOSPITAL_STAFF' ? Building2
+    : Shield;
+
+  // ── Header initials ───────────────────────────────────────────────────────
+  const initials = profile.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
-    <motion.div
-      variants={stagger}
-      initial="hidden"
-      animate="show"
-      className="space-y-6 p-4 md:p-6 max-w-3xl mx-auto"
-    >
-      {/* Profile Header + Completion Indicator */}
+    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6 p-4 md:p-6 max-w-3xl mx-auto">
+      {loading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Syncing latest data…
+        </div>
+      )}
+
+      {/* ── Header ── */}
       <motion.div variants={fadeUp}>
         <Card>
           <CardContent className="p-6">
             <div className="flex items-start gap-4">
               <div className="relative">
                 <Avatar className="h-20 w-20">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">
-                    {patient.name.split(' ').map((n) => n[0]).join('')}
-                  </AvatarFallback>
+                  <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">{initials}</AvatarFallback>
                 </Avatar>
-                <button className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors" onClick={() => toast.info('Opening image picker...')}>
+                <button
+                  className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+                  onClick={() => toast.info('Photo upload coming soon')}
+                >
                   <Camera className="h-3 w-3" />
                 </button>
               </div>
               <div className="flex-1 min-w-0">
-                <h1 className="text-2xl font-bold">{patient.name}</h1>
+                <h1 className="text-2xl font-bold">{profile.name}</h1>
                 <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                  <Mail className="h-3.5 w-3.5" />
-                  {patient.email}
+                  <Mail className="h-3.5 w-3.5" />{profile.email}
                 </p>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="secondary" className="text-xs">
-                    <UserCircle className="h-3 w-3 mr-1" />
-                    Patient
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <Badge className={`text-xs ${ROLE_COLORS[profile.role] || ''}`}>
+                    <RoleIcon className="h-3 w-3 mr-1" />
+                    {ROLE_LABELS[profile.role] || profile.role}
                   </Badge>
-                  {patient.isVerified && (
+                  {profile.isVerified && (
                     <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Verified
+                      <CheckCircle2 className="h-3 w-3 mr-1" />Verified
+                    </Badge>
+                  )}
+                  {profile.role === 'HOSPITAL_STAFF' && extra.department && (
+                    <Badge variant="outline" className="text-xs">
+                      <Stethoscope className="h-3 w-3 mr-1" />{extra.department}
+                    </Badge>
+                  )}
+                  {profile.role === 'DRIVER' && (profile as UserType & { ambulance?: { vehicleNumber: string } }).ambulance?.vehicleNumber && (
+                    <Badge variant="outline" className="text-xs">
+                      <Car className="h-3 w-3 mr-1" />{(profile as UserType & { ambulance?: { vehicleNumber: string } }).ambulance!.vehicleNumber}
                     </Badge>
                   )}
                 </div>
@@ -270,10 +458,7 @@ export default function ProfilePage() {
               <div className="text-right hidden sm:flex flex-col items-end gap-1">
                 <p className="text-xs text-muted-foreground">Member since</p>
                 <p className="text-sm font-medium">
-                  {new Date(patient.createdAt).toLocaleDateString('en-US', {
-                    month: 'short',
-                    year: 'numeric',
-                  })}
+                  {new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                 </p>
               </div>
             </div>
@@ -281,41 +466,25 @@ export default function ProfilePage() {
         </Card>
       </motion.div>
 
-      {/* Profile Completion + Activity Timeline Row */}
+      {/* ── Profile Completion + Role Info row ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Profile Completion Indicator */}
         <motion.div variants={fadeUp}>
-          <Card className="card-hover h-full">
+          <Card className="h-full">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Profile Completion
+                <Activity className="h-5 w-5 text-primary" /> Profile Completion
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <div className="flex flex-col items-center gap-4">
-                <CompletionRing percentage={profileCompletion} />
-                <div className="w-full space-y-2">
-                  {[
-                    { label: 'Name', filled: !!form.name },
-                    { label: 'Email', filled: !!form.email },
-                    { label: 'Phone', filled: !!form.phone },
-                    { label: 'Blood Group', filled: !!form.bloodGroup },
-                    { label: 'Date of Birth', filled: !!form.dateOfBirth },
-                    { label: 'Gender', filled: !!form.gender },
-                    { label: 'Address', filled: !!form.address },
-                    { label: 'Emergency Contacts', filled: contacts.length > 0 },
-                    { label: 'Insurance', filled: !!insurance.policyNumber },
-                  ].map((field) => (
-                    <div key={field.label} className="flex items-center gap-2 text-xs">
-                      {field.filled ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                      ) : (
-                        <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/30 shrink-0" />
-                      )}
-                      <span className={field.filled ? 'text-foreground' : 'text-muted-foreground'}>
-                        {field.label}
-                      </span>
+                <CompletionRing pct={completionPct} />
+                <div className="w-full space-y-1.5">
+                  {completionFields.map((f) => (
+                    <div key={f.label} className="flex items-center gap-2 text-xs">
+                      {f.filled
+                        ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                        : <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/30 shrink-0" />}
+                      <span className={f.filled ? 'text-foreground' : 'text-muted-foreground'}>{f.label}</span>
                     </div>
                   ))}
                 </div>
@@ -324,73 +493,88 @@ export default function ProfilePage() {
           </Card>
         </motion.div>
 
-        {/* Activity Timeline */}
+        {/* Role-specific info card */}
         <motion.div variants={fadeUp}>
-          <Card className="card-hover h-full">
+          <Card className="h-full">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
-                Recent Activity
+                <RoleIcon className="h-5 w-5 text-primary" />
+                {profile.role === 'PATIENT' ? 'Health Summary'
+                  : profile.role === 'DRIVER' ? 'Driver Info'
+                  : profile.role === 'HOSPITAL_STAFF' ? 'Hospital Info'
+                  : 'Admin Access'}
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="relative">
-                {/* Vertical line */}
-                <div className="absolute left-[15px] top-2 bottom-2 w-px bg-border" />
-
-                <div className="space-y-4">
-                  {ACTIVITY_TIMELINE.map((item, index) => {
-                    const Icon = item.icon;
-                    return (
-                      <motion.div
-                        key={item.id}
-                        className="flex items-start gap-3 relative"
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.1 + index * 0.08 }}
-                      >
-                        {/* Dot */}
-                        <div className={`relative z-10 w-[30px] h-[30px] rounded-full ${item.bgColor} flex items-center justify-center shrink-0`}>
-                          <Icon className={`h-3.5 w-3.5 ${item.color}`} />
-                        </div>
-                        {/* Content */}
-                        <div className="flex-1 min-w-0 pt-1">
-                          <p className="text-sm font-medium leading-tight">{item.event}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{item.time}</p>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </div>
+            <CardContent className="p-4 pt-0 space-y-3">
+              {profile.role === 'PATIENT' && (
+                <>
+                  <InfoRow icon={<Heart className="h-3.5 w-3.5 text-red-500" />} label="Blood Group"
+                    value={BLOOD_GROUP_LABELS[profile.bloodGroup || ''] || 'Not set'} />
+                  <InfoRow icon={<Tag className="h-3.5 w-3.5 text-amber-500" />} label="Allergies"
+                    value={profile.allergies?.length ? profile.allergies.join(', ') : 'None'} />
+                  <InfoRow icon={<Activity className="h-3.5 w-3.5 text-violet-500" />} label="Conditions"
+                    value={profile.chronicConditions?.length ? profile.chronicConditions.join(', ') : 'None'} />
+                  <InfoRow icon={<Users className="h-3.5 w-3.5 text-sky-500" />} label="Emergency Contacts"
+                    value={`${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`} />
+                </>
+              )}
+              {profile.role === 'DRIVER' && (
+                <>
+                  <InfoRow icon={<KeyRound className="h-3.5 w-3.5 text-amber-500" />} label="License No."
+                    value={extra.licenseNumber || 'Not set'} />
+                  <InfoRow icon={<Clock className="h-3.5 w-3.5 text-sky-500" />} label="Experience"
+                    value={extra.experience ? `${extra.experience} years` : 'Not set'} />
+                  <InfoRow icon={<Car className="h-3.5 w-3.5 text-emerald-500" />} label="Vehicle"
+                    value={(profile as UserType & { ambulance?: { vehicleNumber: string; status: string } }).ambulance?.vehicleNumber || 'Not assigned'} />
+                  <InfoRow icon={<Activity className="h-3.5 w-3.5 text-violet-500" />} label="Vehicle Status"
+                    value={(profile as UserType & { ambulance?: { vehicleNumber: string; status: string } }).ambulance?.status || 'N/A'} />
+                </>
+              )}
+              {profile.role === 'HOSPITAL_STAFF' && (
+                <>
+                  <InfoRow icon={<Building2 className="h-3.5 w-3.5 text-sky-500" />} label="Hospital"
+                    value={(profile as UserType & { hospital?: { name: string; city: string } }).hospital?.name || 'N/A'} />
+                  <InfoRow icon={<MapPin className="h-3.5 w-3.5 text-rose-500" />} label="City"
+                    value={(profile as UserType & { hospital?: { name: string; city: string } }).hospital?.city || 'N/A'} />
+                  <InfoRow icon={<Stethoscope className="h-3.5 w-3.5 text-emerald-500" />} label="Department"
+                    value={extra.department || 'Not set'} />
+                  <InfoRow icon={<BadgeCheck className="h-3.5 w-3.5 text-violet-500" />} label="Employee ID"
+                    value={extra.employeeId || 'Not set'} />
+                </>
+              )}
+              {profile.role === 'ADMIN' && (
+                <>
+                  <InfoRow icon={<Shield className="h-3.5 w-3.5 text-violet-500" />} label="Access Level" value="Full System Admin" />
+                  <InfoRow icon={<UserCircle className="h-3.5 w-3.5 text-sky-500" />} label="Modules" value="Users, Hospitals, Analytics, Reports" />
+                  <InfoRow icon={<CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />} label="Status" value="Active & Verified" />
+                  <InfoRow icon={<Clock className="h-3.5 w-3.5 text-amber-500" />} label="Admin Since"
+                    value={new Date(profile.createdAt).toLocaleDateString('en-IN')} />
+                </>
+              )}
             </CardContent>
           </Card>
         </motion.div>
       </div>
 
-      {/* Edit Profile */}
+      {/* ── Personal Info (editable) ── */}
       <motion.div variants={fadeUp}>
-        <Card className="card-hover">
+        <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
-                <User className="h-5 w-5 text-primary" />
-                Personal Information
+                <User className="h-5 w-5 text-primary" /> Personal Information
               </CardTitle>
               {!editing ? (
                 <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setEditing(true)}>
-                  <Edit3 className="h-3.5 w-3.5" />
-                  Edit
+                  <Edit3 className="h-3.5 w-3.5" /> Edit
                 </Button>
               ) : (
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" className="text-xs" onClick={() => setEditing(false)}>
-                    <X className="h-3.5 w-3.5 mr-1" />
-                    Cancel
+                    <X className="h-3.5 w-3.5 mr-1" /> Cancel
                   </Button>
                   <Button size="sm" className="gap-1.5 text-xs" onClick={handleSave}>
-                    <Save className="h-3.5 w-3.5" />
-                    Save
+                    <Save className="h-3.5 w-3.5" /> Save
                   </Button>
                 </div>
               )}
@@ -398,338 +582,313 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Full Name</Label>
-                {editing ? (
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                ) : (
-                  <p className="text-sm font-medium">{patient.name}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Email</Label>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-sm font-medium">{patient.email}</p>
-                  <Badge variant="outline" className="text-[10px]">Read Only</Badge>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Phone</Label>
-                {editing ? (
-                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                ) : (
-                  <p className="text-sm font-medium flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    {patient.phone}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Blood Group</Label>
-                {editing ? (
-                  <Select value={form.bloodGroup} onValueChange={(v) => setForm({ ...form, bloodGroup: v as any })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {BLOOD_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-sm font-medium flex items-center gap-1.5">
-                    <Heart className="h-3.5 w-3.5 text-red-500" />
-                    {BLOOD_GROUP_LABELS[patient.bloodGroup || 'O_POS']}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Date of Birth</Label>
-                {editing ? (
-                  <Input
-                    type="date"
-                    value={form.dateOfBirth}
-                    onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
-                  />
-                ) : (
-                  <p className="text-sm font-medium flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                    {patient.dateOfBirth
-                      ? new Date(patient.dateOfBirth).toLocaleDateString('en-US', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })
-                      : 'Not set'}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Gender</Label>
-                {editing ? (
+              <Field label="Full Name" editing={editing}
+                display={<span className="text-sm font-medium">{profile.name}</span>}
+                input={<Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />}
+              />
+              <Field label="Email" editing={false}
+                display={
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium">{profile.email}</span>
+                    <Badge variant="outline" className="text-[10px]">Read Only</Badge>
+                  </div>
+                }
+                input={null}
+              />
+              <Field label="Phone" editing={editing}
+                display={<span className="text-sm font-medium flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-muted-foreground" />{profile.phone || 'Not set'}</span>}
+                input={<Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91-XXXXXXXXXX" />}
+              />
+              <Field label="Gender" editing={editing}
+                display={<span className="text-sm font-medium">{profile.gender || 'Not set'}</span>}
+                input={
                   <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Male">Male</SelectItem>
                       <SelectItem value="Female">Female</SelectItem>
                       <SelectItem value="Other">Other</SelectItem>
                     </SelectContent>
                   </Select>
+                }
+              />
+              <Field label="Date of Birth" editing={editing}
+                display={<span className="text-sm font-medium flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                  {profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Not set'}
+                </span>}
+                input={<Input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} />}
+              />
+              {/* Address — only for patient & admin (not JSON-encoded roles) */}
+              {!isJSONAddress(profile.address) && (
+                <Field label="Address" editing={editing}
+                  display={<span className="text-sm font-medium flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />{plainAddress || 'Not set'}
+                  </span>}
+                  input={<Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Your address" />}
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* ── Medical Profile (PATIENT only) ── */}
+      {profile.role === 'PATIENT' && (
+        <motion.div variants={fadeUp}>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Stethoscope className="h-5 w-5 text-primary" /> Medical Profile
+                </CardTitle>
+                {!medEditing ? (
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setMedEditing(true)}>
+                    <Edit3 className="h-3.5 w-3.5" /> Edit
+                  </Button>
                 ) : (
-                  <p className="text-sm font-medium">{patient.gender || 'Not set'}</p>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" className="text-xs" onClick={() => setMedEditing(false)}>
+                      <X className="h-3.5 w-3.5 mr-1" /> Cancel
+                    </Button>
+                    <Button size="sm" className="gap-1.5 text-xs" onClick={handleSaveMedical}>
+                      <Save className="h-3.5 w-3.5" /> Save
+                    </Button>
+                  </div>
                 )}
               </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label className="text-xs text-muted-foreground">Address</Label>
-                {editing ? (
-                  <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-4">
+              {/* Blood Group */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Blood Group</Label>
+                {medEditing ? (
+                  <Select value={medForm.bloodGroup} onValueChange={(v) => setMedForm({ ...medForm, bloodGroup: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select blood group" /></SelectTrigger>
+                    <SelectContent>{BLOOD_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                  </Select>
                 ) : (
                   <p className="text-sm font-medium flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                    {patient.address || 'Not set'}
+                    <Heart className="h-3.5 w-3.5 text-red-500" />
+                    {BLOOD_GROUP_LABELS[profile.bloodGroup || ''] || 'Not set'}
                   </p>
                 )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
 
-      {/* Emergency Contacts */}
-      <motion.div variants={fadeUp}>
-        <Card className="card-hover">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Contact className="h-5 w-5 text-primary" />
-                Emergency Contacts
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 text-xs"
-                onClick={() => setShowAddContact(!showAddContact)}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 pt-0 space-y-3">
-            {contacts.map((contact) => (
-              <div key={contact.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
-                    {contact.name.split(' ').map((n) => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{contact.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {contact.relationship} &middot; {contact.phone}
-                  </p>
+              {/* Medical tags */}
+              {[
+                { key: 'allergies' as const, label: 'Allergies', placeholder: 'e.g. Penicillin…' },
+                { key: 'currentMedications' as const, label: 'Current Medications', placeholder: 'e.g. Metformin 500mg…' },
+                { key: 'chronicConditions' as const, label: 'Chronic Conditions', placeholder: 'e.g. Type 2 Diabetes…' },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key} className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">{label}</Label>
+                  {medEditing ? (
+                    <TagList
+                      tags={medForm[key]}
+                      onAdd={(t) => setMedForm((prev) => ({ ...prev, [key]: [...prev[key], t] }))}
+                      onRemove={(t) => setMedForm((prev) => ({ ...prev, [key]: prev[key].filter((x) => x !== t) }))}
+                      placeholder={placeholder}
+                    />
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(profile[key] || []).length === 0
+                        ? <span className="text-xs text-muted-foreground italic">None listed</span>
+                        : (profile[key] || []).map((t) => (
+                          <span key={t} className="px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground border">{t}</span>
+                        ))}
+                    </div>
+                  )}
                 </div>
-                <a href={`tel:${contact.phone}`} className="p-2 rounded-lg hover:bg-muted transition-colors">
-                  <Phone className="h-4 w-4 text-primary" />
-                </a>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleRemoveContact(contact.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
+              ))}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* ── Emergency Contacts (PATIENT only) ── */}
+      {profile.role === 'PATIENT' && (
+        <motion.div variants={fadeUp}>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Contact className="h-5 w-5 text-primary" /> Emergency Contacts
+                </CardTitle>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setShowAddContact(!showAddContact)}>
+                  <Plus className="h-3.5 w-3.5" /> Add
                 </Button>
               </div>
-            ))}
-
-            {/* Add Contact Form */}
-            <AnimatePresence>
-              {showAddContact && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="space-y-2 p-3 rounded-lg border">
-                    <Input
-                      placeholder="Contact name"
-                      value={newContact.name}
-                      onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        placeholder="Relationship"
-                        value={newContact.relationship}
-                        onChange={(e) => setNewContact({ ...newContact, relationship: e.target.value })}
-                      />
-                      <Input
-                        placeholder="Phone number"
-                        value={newContact.phone}
-                        onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" className="flex-1" onClick={handleAddContact}>
-                        Add Contact
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setShowAddContact(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                </motion.div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-3">
+              {contacts.length === 0 && !showAddContact && (
+                <p className="text-sm text-muted-foreground text-center py-4">No emergency contacts added yet.</p>
               )}
-            </AnimatePresence>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Insurance Card - Real Insurance Card Look */}
-      <motion.div variants={fadeUp}>
-        <Card className="card-hover overflow-hidden">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-primary" />
-                Insurance Information
-              </CardTitle>
-              <Badge
-                className={`text-xs ${
-                  isInsuranceExpiringSoon
-                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-                }`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full mr-1 ${isInsuranceExpiringSoon ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                {isInsuranceExpiringSoon ? 'Expiring Soon' : 'Active'}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            {/* Insurance Card Visual */}
-            <div className="rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 dark:from-slate-700 dark:to-slate-800 p-5 text-white relative overflow-hidden">
-              {/* Decorative elements */}
-              <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/4" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-white/5 translate-y-1/2 -translate-x-1/4" />
-
-              <div className="relative z-10">
-                {/* Provider logo + name */}
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                      <Building2 className="h-5 w-5 text-amber-400" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm">{insurance.provider}</p>
-                      <p className="text-[10px] text-white/50 uppercase tracking-wider">Health Insurance</p>
-                    </div>
+              {contacts.map((c) => (
+                <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                      {c.name.split(' ').map((n) => n[0]).join('')}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{c.name}</p>
+                    <p className="text-xs text-muted-foreground">{c.relationship} · {c.phone}</p>
                   </div>
-                  <Badge
-                    variant="secondary"
-                    className="bg-white/10 text-white border-0 text-[10px]"
-                  >
-                    {insurance.coverageType}
-                  </Badge>
+                  <a href={`tel:${c.phone}`} className="p-2 rounded-lg hover:bg-muted transition-colors">
+                    <Phone className="h-4 w-4 text-primary" />
+                  </a>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleRemoveContact(c.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
+              ))}
 
-                {/* Policy details */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] text-white/40 uppercase tracking-wider">Policy Number</p>
-                    <p className="font-mono text-sm font-bold tracking-wider">{insurance.policyNumber}</p>
-                  </div>
-
-                  <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] text-white/40 uppercase tracking-wider">Valid Until</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">
-                        {new Date(insurance.validUntil).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </p>
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          isInsuranceExpiringSoon ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'
-                        }`}
-                      />
+              <AnimatePresence>
+                {showAddContact && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                    <div className="space-y-2 p-3 rounded-lg border">
+                      <Input placeholder="Contact name" value={newContact.name}
+                        onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input placeholder="Relationship" value={newContact.relationship}
+                          onChange={(e) => setNewContact({ ...newContact, relationship: e.target.value })} />
+                        <Input placeholder="Phone number" value={newContact.phone}
+                          onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1" onClick={handleAddContact} disabled={savingContact}>
+                          {savingContact ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                          Add Contact
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowAddContact(false)}>Cancel</Button>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
-                {/* Card decoration */}
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="w-6 h-6 rounded-md bg-amber-400/20 border border-amber-400/30"
-                      />
-                    ))}
+      {/* ── Driver Service Area (editable) ── */}
+      {profile.role === 'DRIVER' && (
+        <motion.div variants={fadeUp}>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-primary" /> Service Area
+                </CardTitle>
+                {!serviceAreaEditing ? (
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setServiceAreaEditing(true)}>
+                    <Edit3 className="h-3.5 w-3.5" /> Edit
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" className="text-xs" onClick={() => setServiceAreaEditing(false)}>
+                      <X className="h-3.5 w-3.5 mr-1" /> Cancel
+                    </Button>
+                    <Button size="sm" className="gap-1.5 text-xs" onClick={handleSaveServiceArea}>
+                      <Save className="h-3.5 w-3.5" /> Save
+                    </Button>
                   </div>
-                  <p className="text-[9px] text-white/30">LifeLink Health Card</p>
-                </div>
+                )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <p className="text-xs text-muted-foreground mb-3">Update your location to receive relevant SOS alerts.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Field label="City" editing={serviceAreaEditing}
+                  display={<span className="text-sm font-medium">{profile.city || 'Not set'}</span>}
+                  input={<Input value={serviceAreaForm.city} onChange={(e) => setServiceAreaForm({ ...serviceAreaForm, city: e.target.value })} placeholder="e.g. New Delhi" />}
+                />
+                <Field label="Pin Code" editing={serviceAreaEditing}
+                  display={<span className="text-sm font-medium">{profile.pinCode || 'Not set'}</span>}
+                  input={<Input value={serviceAreaForm.pinCode} onChange={(e) => setServiceAreaForm({ ...serviceAreaForm, pinCode: e.target.value })} placeholder="e.g. 110016" />}
+                />
+                <Field label="Country" editing={serviceAreaEditing}
+                  display={<span className="text-sm font-medium">{profile.country || 'Not set'}</span>}
+                  input={<Input value={serviceAreaForm.country} onChange={(e) => setServiceAreaForm({ ...serviceAreaForm, country: e.target.value })} placeholder="e.g. India" />}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
-      {/* Account Actions */}
+      {/* ── Driver Vehicle info (read-only, managed by admin) ── */}
+      {profile.role === 'DRIVER' && (
+        <motion.div variants={fadeUp}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Truck className="h-5 w-5 text-primary" /> Vehicle & License Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <p className="text-xs text-muted-foreground mb-3">Contact your admin to update these details.</p>
+              <div className="grid grid-cols-2 gap-4">
+                <InfoRow icon={<KeyRound className="h-3.5 w-3.5 text-amber-500" />} label="License Number" value={extra.licenseNumber || 'Not set'} />
+                <InfoRow icon={<Clock className="h-3.5 w-3.5 text-sky-500" />} label="Experience" value={extra.experience ? `${extra.experience} years` : 'Not set'} />
+                <InfoRow icon={<Car className="h-3.5 w-3.5 text-emerald-500" />} label="Vehicle No."
+                  value={(profile as UserType & { ambulance?: { vehicleNumber: string } }).ambulance?.vehicleNumber || 'Not assigned'} />
+                <InfoRow icon={<Activity className="h-3.5 w-3.5 text-violet-500" />} label="Status"
+                  value={(profile as UserType & { ambulance?: { status: string } }).ambulance?.status || 'N/A'} />
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* ── Account Actions ── */}
       <motion.div variants={fadeUp}>
-        <Card className="card-hover">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              Account
+              <Shield className="h-5 w-5 text-primary" /> Account
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0 space-y-3">
-            <Button variant="outline" className="w-full gap-2 justify-start" onClick={() => toast.success('Password reset link sent to your email.')}>
-              <Lock className="h-4 w-4" />
-              Change Password
+            <Button variant="outline" className="w-full gap-2 justify-start"
+              onClick={() => toast.success('Password reset link sent to your email.')}>
+              <Lock className="h-4 w-4" /> Change Password
             </Button>
 
-            <Button
-              variant="outline"
-              className="w-full gap-2 justify-start"
-              onClick={handleDownloadHealthSummary}
-            >
-              <FileDown className="h-4 w-4" />
-              Download Health Summary
-            </Button>
+            {profile.role === 'PATIENT' && (
+              <Button variant="outline" className="w-full gap-2 justify-start"
+                onClick={() => toast.success('Health summary PDF generated!')}>
+                <FileDown className="h-4 w-4" /> Download Health Summary
+              </Button>
+            )}
+
+            {profile.role === 'PATIENT' && (
+              <Button variant="outline" className="w-full gap-2 justify-start"
+                onClick={() => setCurrentPage('insurance')}>
+                <Heart className="h-4 w-4" /> Manage Insurance
+              </Button>
+            )}
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="w-full gap-2 justify-start">
-                  <AlertTriangle className="h-4 w-4" />
-                  Delete Account
+                  <AlertTriangle className="h-4 w-4" /> Delete Account
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete your account and remove all of your data from our servers.
+                    This will permanently delete your account and all associated data. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction className="bg-destructive text-white hover:bg-destructive/90">
+                  <AlertDialogAction className="bg-destructive text-white hover:bg-destructive/90"
+                    onClick={() => { toast.error('Account deletion requested — contact support to confirm.'); }}>
                     Delete Account
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -739,5 +898,27 @@ export default function ProfilePage() {
         </Card>
       </motion.div>
     </motion.div>
+  );
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+function Field({ label, editing, display, input }: { label: string; editing: boolean; display: React.ReactNode; input: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      {editing && input ? input : display}
+    </div>
+  );
+}
+
+function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2 text-sm">
+      <span className="mt-0.5 shrink-0">{icon}</span>
+      <div>
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <p className="font-medium text-sm leading-tight">{value}</p>
+      </div>
+    </div>
   );
 }

@@ -745,3 +745,179 @@
 .animate-slide-in-right {
   animation: slide-in-right 0.35s ease-out;
 }
+
+/* ============================================================ */
+/* 3D Animation Utilities                                        */
+/* ============================================================ */
+
+/* Perspective container for 3D children */
+.perspective-card {
+  perspective: 900px;
+  transform-style: preserve-3d;
+}
+
+/* 3D floating animation for hero elements */
+@keyframes float-3d {
+  0%, 100% { transform: translateY(0) rotateX(0) rotateY(0); }
+  25%       { transform: translateY(-8px) rotateX(2deg) rotateY(-2deg); }
+  50%       { transform: translateY(-14px) rotateX(0deg) rotateY(0deg); }
+  75%       { transform: translateY(-8px) rotateX(-2deg) rotateY(2deg); }
+}
+.animate-float-3d {
+  animation: float-3d 6s ease-in-out infinite;
+}
+
+/* Deep shadow for 3D lifted cards */
+.shadow-3d {
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.07),
+    0 4px 8px oklch(0 0 0 / 0.06),
+    0 8px 16px oklch(0 0 0 / 0.05),
+    0 16px 32px oklch(0 0 0 / 0.04);
+}
+.dark .shadow-3d {
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.3),
+    0 4px 8px oklch(0 0 0 / 0.25),
+    0 8px 16px oklch(0 0 0 / 0.2),
+    0 16px 32px oklch(0 0 0 / 0.15);
+}
+
+/* Depth shimmer overlay that appears on 3D hover */
+@keyframes depth-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+.depth-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.depth-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    oklch(1 0 0 / 0.04) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.depth-shimmer:hover::after {
+  opacity: 1;
+  animation: depth-shimmer 1.2s ease-in-out;
+}
+
+/* Rotating emergency ring animation */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.spin-slow { animation: spin-slow 8s linear infinite; }
+
+/* Glow shadow pulse for active emergency indicator */
+@keyframes emergency-glow {
+  0%, 100% { box-shadow: 0 0 10px oklch(0.55 0.24 27 / 0.4); }
+  50%       { box-shadow: 0 0 30px oklch(0.55 0.24 27 / 0.8), 0 0 60px oklch(0.55 0.24 27 / 0.3); }
+}
+.emergency-glow-pulse {
+  animation: emergency-glow 2s ease-in-out infinite;
+}
+
+/* ============================================================ */
+/* State-of-the-Art Dashboard Utilities                          */
+/* ============================================================ */
+
+/* Larger fluid typography helpers */
+.text-display {
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+/* Dashboard background ambient effect */
+.dashboard-ambient {
+  position: relative;
+}
+.dashboard-ambient::before {
+  content: '';
+  position: fixed;
+  top: 0; right: 0;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.55 0.18 264 / 0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Gradient accent underline */
+.accent-underline {
+  position: relative;
+  display: inline-block;
+}
+.accent-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -4px; left: 0;
+  width: 100%; height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, oklch(0.55 0.24 27), oklch(0.55 0.2 310));
+}
+
+/* Bold stat number */
+.stat-number {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* Card with colored left border accent */
+.card-accent-left {
+  border-left: 3px solid;
+  border-left-color: oklch(0.55 0.24 27);
+}
+
+/* Frosted glass card for dark backgrounds */
+.frosted-card {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Neon border glow on hover */
+.neon-hover {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.neon-hover:hover {
+  box-shadow: 0 0 0 1px oklch(0.55 0.2 264 / 0.5), 0 0 20px oklch(0.55 0.2 264 / 0.15);
+}
+
+/* Section reveal underline animation */
+@keyframes underline-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.underline-grow {
+  transform-origin: left;
+  animation: underline-grow 0.6s ease-out forwards;
+}
+
+/* Hero text stroke utility */
+.text-stroke-sm {
+  -webkit-text-stroke: 1px currentColor;
+  color: transparent;
+}
+
+/* Animated mesh gradient overlay for hero sections */
+.mesh-overlay {
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(99,102,241,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 100%, rgba(236,72,153,0.06) 0%, transparent 50%);
+  pointer-events: none;
+}

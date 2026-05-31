@@ -26,6 +26,9 @@ import CountdownTimer from '@/components/sos/CountdownTimer';
 import EmergencyTimeline from '@/components/sos/EmergencyTimeline';
 import TriageChat from '@/components/ai/TriageChat';
 import { useToast } from '@/hooks/use-toast';
+import { useGeolocation } from '@/hooks/useGeolocation';
+import { useSosStatus } from '@/hooks/useSosStatus';
+import { useRouter } from 'next/navigation';
 
 /* ------------------------------------------------------------------ */
 /*  Connection Steps shown after activation                           */
@@ -86,38 +89,58 @@ export default function SOSPage() {
   } = useEmergencyStore();
   const { setCurrentPage } = useNavigationStore();
   const { toast } = useToast();
+  const router = useRouter();
 
   const prefersReducedMotion = useReducedMotion();
 
-  const [locationDetected, setLocationDetected] = useState(false);
-  const [locationText, setLocationText] = useState('Detecting location...');
+  // Use the real geolocation hook
+  const geo = useGeolocation();
+  const locationDetected = !geo.loading && !geo.error && geo.city !== 'Unknown';
+  const locationText = geo.loading 
+    ? 'Detecting location...' 
+    : geo.error 
+      ? 'Location unavailable' 
+      : `${geo.pinCode ? geo.pinCode + ' · ' : ''}${geo.city}${geo.country ? ' · ' + geo.country : ''} (${geo.latitude.toFixed(4)}, ${geo.longitude.toFixed(4)})`;
+
+  // Local UI state
   const [showConfirm, setShowConfirm] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
-  const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [redirectTimer, setRedirectTimer] = useState(5);
-  const [emergencyElapsed, setEmergencyElapsed] = useState(0);
 
-  const sosButtonRef = useRef<HTMLDivElement>(null);
-  const redirectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pendingSeverityRef = useRef<number>(4);
+  // Real DB emergency state
+  const [realEmergencyId, setRealEmergencyId] = useState<string | null>(null);
+  const { data: realEmergency } = useSosStatus(realEmergencyId);
+
+  // Compute completed steps based strictly on real backend state
+  const completedSteps = new Set<string>();
+  if (sosActivated) {
+    completedSteps.add('location'); // always true when SOS triggered
+    if (realEmergencyId) {
+      completedSteps.add('alert');
+    }
+    const realStatus = realEmergency?.status;
+    if (realStatus && ['ACTIVE', 'EN_ROUTE', 'ARRIVED', 'COMPLETED'].includes(realStatus)) {
+      completedSteps.add('ambulance');
+    }
+    if (realEmergency?.hospitalId) {
+      completedSteps.add('hospital');
+    }
+  }
+
+  const pendingSeverityRef = useRef<number>(1);
   const pendingDescriptionRef = useRef<string | undefined>(undefined);
+  const sosButtonRef = useRef<HTMLDivElement>(null);
 
-  /* Simulate location detection */
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLocationDetected(true);
-      setLocationText('New Delhi, India');
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, []);
+  /* Time elapsed - local fallback timer (real elapsed in realEmergency.elapsedSeconds) */
+  const [emergencyElapsed, setEmergencyElapsed] = useState(0);
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const redirectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /* Live elapsed timer when emergency is active */
   useEffect(() => {
     if (sosActivated && activeEmergency) {
-      const startTime = new Date(activeEmergency.startedAt).getTime();
+      const start = new Date(activeEmergency.startedAt).getTime();
       elapsedTimerRef.current = setInterval(() => {
-        setEmergencyElapsed(Math.floor((Date.now() - startTime) / 1000));
+        setEmergencyElapsed(Math.floor((Date.now() - start) / 1000));
       }, 1000);
     } else {
       if (elapsedTimerRef.current) {
@@ -130,43 +153,8 @@ export default function SOSPage() {
     };
   }, [sosActivated, activeEmergency]);
 
-  /* Reactive connection steps based on actual emergency status */
-  const wasActiveRef = useRef(false);
-
-  useEffect(() => {
-    if (!sosActivated || !activeEmergency) {
-      if (wasActiveRef.current) {
-        wasActiveRef.current = false;
-        setTimeout(() => setCompletedSteps(new Set()), 0);
-      }
-      return;
-    }
-
-    wasActiveRef.current = true;
-    const status = activeEmergency.status;
-
-    // Steps 1 & 2 complete immediately on SOS activation
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(setTimeout(() => {
-      setCompletedSteps((prev) => new Set([...prev, 'location']));
-    }, 800));
-    timers.push(setTimeout(() => {
-      setCompletedSteps((prev) => new Set([...prev, 'alert']));
-    }, 1600));
-
-    // Steps 3 & 4 automatically complete so user gets redirected to Tracking
-    timers.push(setTimeout(() => {
-      setCompletedSteps((prev) => new Set([...prev, 'ambulance']));
-    }, 2400));
-    timers.push(setTimeout(() => {
-      setCompletedSteps((prev) => new Set([...prev, 'hospital']));
-    }, 3200));
-
-    return () => timers.forEach(clearTimeout);
-  }, [sosActivated, activeEmergency, activeEmergency?.status]);
-
-  /* Auto-redirect to tracking after all steps complete */
-  const allStepsDone = completedSteps.size === CONNECTION_STEPS.length;
+  /* Auto-redirect to tracking after ambulance is found */
+  const readyToRedirect = completedSteps.has('ambulance');
   const allDoneRef = useRef(false);
   const redirectCountRef = useRef(5);
 
@@ -177,6 +165,7 @@ export default function SOSPage() {
       if (redirectCountRef.current <= 0) {
         if (redirectTimerRef.current) clearInterval(redirectTimerRef.current);
         setCurrentPage('tracking');
+        router.push('/?page=tracking');
       } else {
         setRedirectTimer(redirectCountRef.current);
       }
@@ -184,11 +173,11 @@ export default function SOSPage() {
   }, [setCurrentPage]);
 
   useEffect(() => {
-    if (allStepsDone && !allDoneRef.current) {
+    if (readyToRedirect && !allDoneRef.current) {
       allDoneRef.current = true;
       startRedirectCountdown();
     }
-    if (!allStepsDone && allDoneRef.current) {
+    if (!readyToRedirect && allDoneRef.current) {
       allDoneRef.current = false;
       if (redirectTimerRef.current) clearInterval(redirectTimerRef.current);
     }
@@ -196,7 +185,7 @@ export default function SOSPage() {
     return () => {
       if (redirectTimerRef.current) clearInterval(redirectTimerRef.current);
     };
-  }, [allStepsDone, startRedirectCountdown]);
+  }, [readyToRedirect, startRedirectCountdown]);
 
   /* Handlers */
   const handleHoldComplete = useCallback(() => {
@@ -212,19 +201,57 @@ export default function SOSPage() {
     []
   );
 
-  const handleCountdownComplete = useCallback(() => {
+  const handleCountdownComplete = useCallback(async () => {
     setShowCountdown(false);
     if (!navigator.onLine) {
       toast({ title: 'Offline Fallback', description: 'Opening SMS to dispatch emergency services.', variant: 'destructive' });
       window.location.href = "sms:108?body=Emergency SOS! Need immediate ambulance assistance.";
       return;
     }
-    activateSOS(pendingSeverityRef.current, pendingDescriptionRef.current);
-  }, [activateSOS, toast]);
+
+    try {
+      // 1. Activate local UI state immediately for responsiveness
+      activateSOS(pendingSeverityRef.current, pendingDescriptionRef.current);
+
+      // 2. Broadcast to real drivers via API
+      const res = await fetch('/api/sos/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude: geo.latitude || (28.6139 + (Math.random() - 0.5) * 0.01), // Fallback if 0
+          longitude: geo.longitude || (77.2090 + (Math.random() - 0.5) * 0.01),
+          severity: pendingSeverityRef.current,
+          description: pendingDescriptionRef.current,
+          city: geo.city, // Pass the geocoded city
+          pinCode: geo.pinCode,
+          country: geo.country,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      
+      const data = await res.json();
+      console.log('SOS Broadcast successful:', data);
+      setRealEmergencyId(data.emergencyId);
+      useEmergencyStore.getState().setDbEmergencyId(data.emergencyId);
+
+    } catch (err) {
+      console.error('Failed to broadcast SOS to real drivers:', err);
+      // We don't cancel the local UI state here, so the demo flow still works
+      // even if the backend broadcast fails.
+      toast({
+        title: 'Broadcast Error',
+        description: 'Failed to reach nearby drivers, falling back to local dispatch.',
+        variant: 'destructive',
+      });
+    }
+  }, [activateSOS, toast, locationText]);
 
   const handleCancel = useCallback(() => {
     cancelEmergency();
-    setCompletedSteps(new Set());
+    setRealEmergencyId(null);
     setRedirectTimer(5);
     if (redirectTimerRef.current) clearInterval(redirectTimerRef.current);
   }, [cancelEmergency]);
@@ -353,6 +380,14 @@ export default function SOSPage() {
             </motion.div>
           </div>
 
+          {/* Location Info */}
+          <div className="flex justify-center px-6 mb-6 mt-[-10px]">
+            <div className="flex items-center gap-2 text-zinc-400 text-xs text-center border border-zinc-800/50 bg-zinc-900/30 rounded-full px-3 py-1.5">
+              <MapPin className="w-3.5 h-3.5 text-zinc-500" />
+              <span>{locationText}</span>
+            </div>
+          </div>
+
           {/* Severity badge */}
           <div className="flex justify-center px-6 mb-6">
             <Badge
@@ -368,8 +403,10 @@ export default function SOSPage() {
             <div className="space-y-5">
               {CONNECTION_STEPS.map((step, index) => {
                 const done = completedSteps.has(step.id);
+                let isWaitingStep = false;
+                if (step.id === 'ambulance' && completedSteps.has('alert') && !done) isWaitingStep = true;
+                if (step.id === 'hospital' && completedSteps.has('ambulance') && !done) isWaitingStep = true;
                 const Icon = step.icon;
-                const isWaitingStep = step.id === 'ambulance' && activeEmergency?.status === 'WAITING_FOR_DRIVER' && !done;
                 return (
                   <motion.div
                     key={step.id}
@@ -407,10 +444,10 @@ export default function SOSPage() {
                           done ? 'text-green-400' : isWaitingStep ? 'text-amber-400' : 'text-zinc-500'
                         }`}
                       >
-                        {isWaitingStep ? 'Waiting for Driver...' : step.label}
+                        {isWaitingStep ? (step.id === 'ambulance' ? 'Waiting for Driver...' : 'Notifying Hospital...') : step.label}
                       </p>
                       {done && <p className="text-[10px] text-green-500/60 mt-0.5">Completed</p>}
-                      {isWaitingStep && <p className="text-[10px] text-amber-400/60 mt-0.5">Searching for nearby drivers</p>}
+                      {isWaitingStep && <p className="text-[10px] text-amber-400/60 mt-0.5">{step.id === 'ambulance' ? 'Searching for nearby drivers' : 'Waiting for hospital response'}</p>}
                     </div>
                   </motion.div>
                 );
@@ -419,12 +456,12 @@ export default function SOSPage() {
           </div>
 
           {/* Timeline */}
-          {activeEmergency.timeline.length > 0 && (
+          {((realEmergency?.timeline || activeEmergency.timeline)?.length || 0) > 0 && (
             <div className="px-6 max-w-md mx-auto w-full mb-6">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
                 Live Timeline
               </h3>
-              <EmergencyTimeline events={activeEmergency.timeline as any} />
+              <EmergencyTimeline events={(realEmergency?.timeline || activeEmergency.timeline) as any} />
             </div>
           )}
 
@@ -550,7 +587,7 @@ export default function SOSPage() {
         {/* SOS Button area with concentric pulse rings */}
         <div
           ref={sosButtonRef}
-          className="relative flex flex-col items-center justify-center flex-1 px-6 -mt-8"
+          className="relative flex flex-col items-center justify-center flex-1 px-6 mt-4"
         >
           {/* Framer Motion Concentric Pulse Rings (always visible, 3 rings) */}
           {!prefersReducedMotion && (

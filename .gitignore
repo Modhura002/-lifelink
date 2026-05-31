@@ -45,6 +45,8 @@ next-env.d.ts
 # prisma
 db/*.db
 db/*.db-journal
+prisma/db/*.db
+prisma/db/*.db-journal
 
 # IDE
 .idea/

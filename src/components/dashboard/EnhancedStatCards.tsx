@@ -15,7 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useEmergencyStore } from '@/store';
-import { DEMO_HOSPITALS, DEMO_PATIENTS } from '@/lib/mock-data';
+import { DEMO_HOSPITALS } from '@/lib/mock-data';
 import { haversineDistance, BLOOD_GROUP_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
@@ -37,11 +37,11 @@ interface StatCardData {
   content: React.ReactNode;
 }
 
-export default function EnhancedStatCards() {
+export default function EnhancedStatCards({ patient }: { patient?: any }) {
   const { sosActivated } = useEmergencyStore();
 
-  const patient = useMemo(() => DEMO_PATIENTS[0], []);
-  const bloodGroupLabel = BLOOD_GROUP_LABELS[patient.bloodGroup || 'O_POS'];
+  const p = patient || { bloodGroup: 'O+', allergies: [], currentMedications: [], emergencyContacts: [] };
+  const bloodGroupLabel = BLOOD_GROUP_LABELS[p.bloodGroup || 'O_POS'];
 
   const nearbyHospitals = useMemo(() => {
     const delhiLat = 28.6139;
@@ -108,11 +108,11 @@ export default function EnhancedStatCards() {
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Bug className="h-3 w-3 text-orange-500" />
-                {patient.allergies.length} {patient.allergies.length === 1 ? 'allergy' : 'allergies'}
+                {p.allergies.length} {p.allergies.length === 1 ? 'allergy' : 'allergies'}
               </span>
               <span className="flex items-center gap-1">
                 <Pill className="h-3 w-3 text-sky-500" />
-                {patient.currentMedications.length} {patient.currentMedications.length === 1 ? 'med' : 'meds'}
+                {p.currentMedications.length} {p.currentMedications.length === 1 ? 'med' : 'meds'}
               </span>
             </div>
           </div>
@@ -145,7 +145,7 @@ export default function EnhancedStatCards() {
         borderColor: 'border-l-amber-500 dark:border-l-amber-400',
         content: (
           <div className="space-y-2">
-            {patient.emergencyContacts.map((contact) => (
+            {p.emergencyContacts.map((contact: any) => (
               <div key={contact.id} className="flex items-center gap-2">
                 <Avatar className="h-7 w-7">
                   <AvatarFallback className="bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-[10px] font-medium">
@@ -167,7 +167,7 @@ export default function EnhancedStatCards() {
         ),
       },
     ],
-    [sosActivated, bloodGroupLabel, nearbyHospitals.length, patient]
+    [sosActivated, bloodGroupLabel, nearbyHospitals.length, p]
   );
 
   return (
@@ -178,12 +178,23 @@ export default function EnhancedStatCards() {
       className="grid grid-cols-2 lg:grid-cols-4 gap-4"
     >
       {cards.map((card) => (
-        <motion.div key={card.id} variants={fadeUp}>
-          <Card className={cn('card-hover border-l-4 overflow-hidden', card.borderColor)}>
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 mb-2 min-w-0">
-                <card.icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide break-words line-clamp-1">
+        <motion.div
+          key={card.id}
+          variants={fadeUp}
+          whileHover={{
+            scale: 1.04,
+            rotateX: -4,
+            rotateY: 4,
+            z: 20,
+            transition: { type: 'spring', stiffness: 400, damping: 20 },
+          }}
+          style={{ perspective: 800, transformStyle: 'preserve-3d' }}
+        >
+          <Card className={cn('card-hover border-l-4 shadow-sm hover:shadow-lg transition-shadow', card.borderColor)}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <card.icon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   {card.title}
                 </span>
               </div>

@@ -6,9 +6,11 @@ import Sidebar from '@/components/layout/Sidebar';
 import MobileSidebar from '@/components/layout/MobileSidebar';
 import Topbar from '@/components/layout/Topbar';
 import SOSFloatingButton from '@/components/dashboard/SOSFloatingButton';
-import OnboardingFlow from '@/components/dashboard/OnboardingFlow';
+import SOSAlertBanner from '@/components/dashboard/SOSAlertBanner';
+import MedicalChatbot from '@/components/ai/MedicalChatbot';
 import { useNavigationStore } from '@/store';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDemoNotifications } from '@/hooks/use-demo-notifications';
 import { cn } from '@/lib/utils';
 
 interface DashboardLayoutProps {
@@ -20,10 +22,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
 
+  // Seed mock notifications for demo accounts only
+  useDemoNotifications();
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Onboarding overlay */}
-      <OnboardingFlow />
+      {/* Global SOS Alert Banner */}
+      <SOSAlertBanner />
+
+      {/* Global AI Medical Chatbot */}
+      <MedicalChatbot />
+
 
       {/* Desktop Sidebar */}
       <AnimatePresence>

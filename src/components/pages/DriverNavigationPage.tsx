@@ -22,6 +22,7 @@ import {
   PhoneCall,
   Flag,
   Waypoints,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,9 +31,10 @@ import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { SEVERITY_LABELS, DEMO_PATIENTS, DEMO_HOSPITALS } from '@/lib/mock-data';
 import { BLOOD_GROUP_LABELS } from '@/lib/constants';
-import { useNavigationStore, useEmergencyStore } from '@/store';
+import { useNavigationStore, useEmergencyStore, useDriverAssignmentStore } from '@/store';
 import { useToast } from '@/hooks/use-toast';
 import MapWrapper from '@/components/ui/MapWrapper';
+import { useRouter } from 'next/navigation';
 
 /* ──────────────────────────────────────────────
    Animation variants
@@ -116,16 +118,65 @@ export default function DriverNavigationPage() {
 
   const setCurrentPage = useNavigationStore((s) => s.setCurrentPage);
   const { markArrived, completeEmergency } = useEmergencyStore();
+  const { assignment: realAssignment, clearAssignment } = useDriverAssignmentStore();
   const { toast } = useToast();
+  const [completing, setCompleting] = useState(false);
+  const router = useRouter();
 
-  const handleCompleteTrip = () => {
-    completeEmergency();
-    setCurrentPage('driver-dashboard');
+  const handleCompleteTrip = async () => {
+    if (!realAssignment?.emergencyId) {
+      // Demo mode fallback
+      completeEmergency();
+      clearAssignment();
+      setCurrentPage('driver-dashboard');
+      router.push('/?page=driver-dashboard');
+      return;
+    }
+
+    setCompleting(true);
+    try {
+      const res = await fetch('/api/driver/complete-emergency', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emergencyId: realAssignment.emergencyId }),
+      });
+
+      if (!res.ok) throw new Error('Failed to complete emergency');
+
+      completeEmergency();
+      clearAssignment();
+      setCurrentPage('driver-dashboard');
+      router.push('/?page=driver-dashboard');
+      toast({ title: 'Trip Completed', description: 'Emergency resolved successfully.' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to complete trip.', variant: 'destructive' });
+    } finally {
+      setCompleting(false);
+    }
   };
 
-  /* Assignment data */
-  const assignment = useMemo(
-    () => ({
+  /* Assignment data — prefer real data from SSE accept, fall back to demo */
+  const assignment = useMemo(() => {
+    if (realAssignment) {
+      const patient = {
+        name: realAssignment.patient.name ?? 'Unknown Patient',
+        bloodGroup: realAssignment.patient.patientProfile?.bloodGroup ?? 'O_POS',
+        id: realAssignment.patient.id,
+        phone: realAssignment.patient.phone,
+      };
+      const demoHosp = DEMO_HOSPITALS[0];
+      return {
+        patient,
+        hospital: demoHosp,
+        severity: realAssignment.severity,
+        pickup: `${realAssignment.city} (${realAssignment.latitude.toFixed(3)}, ${realAssignment.longitude.toFixed(3)})`,
+        eta: '~8 min',
+        distance: '~3 km',
+        emergencyId: realAssignment.emergencyId,
+      };
+    }
+    // Demo fallback
+    return {
       patient: DEMO_PATIENTS.find((p) => p.id === 'usr-patient-1') ?? DEMO_PATIENTS[0],
       hospital: DEMO_HOSPITALS.find((h) => h.id === 'hosp-3') ?? DEMO_HOSPITALS[0],
       severity: 4,
@@ -133,9 +184,8 @@ export default function DriverNavigationPage() {
       eta: '12 min',
       distance: '3.2 km',
       emergencyId: 'ER-A3F2K1',
-    }),
-    []
-  );
+    };
+  }, [realAssignment]);
 
   const sev = SEVERITY_LABELS[assignment.severity] || SEVERITY_LABELS[1];
   const bloodLabel = BLOOD_GROUP_LABELS[assignment.patient.bloodGroup ?? 'O_POS'];
@@ -341,9 +391,14 @@ export default function DriverNavigationPage() {
                   </Button>
                   <Button
                     onClick={handleCompleteTrip}
+                    disabled={completing}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 h-12 rounded-full px-5 shadow-lg shadow-emerald-500/30 text-xs pointer-events-auto"
                   >
-                    <CheckCircle2 className="h-4 w-4" />
+                    {completing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
                     Complete Trip
                   </Button>
                 </div>

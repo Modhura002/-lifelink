@@ -24,9 +24,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { useAuthStore } from '@/store';
 import { useNavigationStore } from '@/store';
-import { DEMO_PASSWORD } from '@/lib/constants';
+import { signIn } from 'next-auth/react';
 import { DASHBOARD_STATS } from '@/lib/mock-data';
 import type { PageRoute, Role } from '@/types';
 import { cn } from '@/lib/utils';
@@ -36,51 +35,10 @@ const ROLE_DASHBOARD_MAP: Record<Role, PageRoute> = {
   DRIVER: 'driver-dashboard',
   HOSPITAL_STAFF: 'hospital-dashboard',
   ADMIN: 'admin',
+  UNASSIGNED: 'landing',
 };
 
-interface DemoAccount {
-  label: string;
-  email: string;
-  icon: React.ReactNode;
-  color: string;
-  avatarColor: string;
-  description: string;
-}
-
-const DEMO_ACCOUNTS: DemoAccount[] = [
-  {
-    label: 'Patient',
-    email: 'patient@lifelink.com',
-    icon: <User className="size-4" />,
-    color: 'border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 dark:hover:border-emerald-600',
-    avatarColor: 'bg-emerald-600',
-    description: 'Arjun Mehta',
-  },
-  {
-    label: 'Driver',
-    email: 'driver@lifelink.com',
-    icon: <Truck className="size-4" />,
-    color: 'border-amber-200 dark:border-amber-800 hover:border-amber-400 dark:hover:border-amber-600',
-    avatarColor: 'bg-amber-600',
-    description: 'Rajesh Kumar',
-  },
-  {
-    label: 'Hospital',
-    email: 'hospital@lifelink.com',
-    icon: <Building2 className="size-4" />,
-    color: 'border-violet-200 dark:border-violet-800 hover:border-violet-400 dark:hover:border-violet-600',
-    avatarColor: 'bg-violet-600',
-    description: 'Dr. Ananya Gupta',
-  },
-  {
-    label: 'Admin',
-    email: 'admin@lifelink.com',
-    icon: <ShieldCheck className="size-4" />,
-    color: 'border-rose-200 dark:border-rose-800 hover:border-rose-400 dark:hover:border-rose-600',
-    avatarColor: 'bg-rose-600',
-    description: 'System Admin',
-  },
-];
+// Demo accounts removed for production
 
 // Floating medical icons for the illustration area
 const FLOATING_ICONS = [
@@ -110,26 +68,27 @@ function AnimatedStat({ value, label, suffix }: { value: number; label: string; 
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Auth and navigation from stores for reliable direct calls
-  const login = useAuthStore((s) => s.login);
   const setCurrentPage = useNavigationStore((s) => s.setCurrentPage);
 
-  const performLogin = (loginEmail: string, loginPassword: string) => {
-    const success = login(loginEmail, loginPassword);
-    if (success) {
-      const user = useAuthStore.getState().user;
-      if (user) {
-        const dashboardPage = ROLE_DASHBOARD_MAP[user.role];
-        setCurrentPage(dashboardPage);
-        toast.success(`Welcome back, ${user.name}!`);
-      }
+  const performLogin = async (loginEmail: string, loginPassword: string) => {
+    const result = await signIn('credentials', {
+      redirect: false,
+      email: loginEmail,
+      password: loginPassword,
+    });
+    
+    if (result?.ok) {
+      toast.success('Welcome back!');
+      // Force reload to sync NextAuth session and trigger dashboard redirect
+      window.location.href = '/';
       return true;
     }
     return false;
@@ -137,6 +96,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError('');
 
     if (!email.trim()) {
       toast.error('Please enter your email address');
@@ -149,30 +109,11 @@ export default function LoginPage() {
 
     setIsLoading(true);
 
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
-    const success = performLogin(email, password);
+    const success = await performLogin(email, password);
 
     if (!success) {
-      toast.error('Invalid credentials. Please try a demo account below.');
-    }
-
-    setIsLoading(false);
-  };
-
-  const handleDemoClick = async (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword(DEMO_PASSWORD);
-    setIsLoading(true);
-
-    // Small delay for visual feedback
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    const success = performLogin(demoEmail, DEMO_PASSWORD);
-
-    if (!success) {
-      toast.error('Login failed. Please try again.');
+      setLoginError('Invalid email or password');
+      toast.error('Invalid email or password');
     }
 
     setIsLoading(false);
@@ -352,7 +293,7 @@ export default function LoginPage() {
 
           {/* Social Login Buttons */}
           <div className="grid grid-cols-2 gap-3 mb-6">
-            <Button variant="outline" className="h-11 gap-2 font-normal text-sm" type="button">
+            <Button variant="outline" className="h-11 gap-2 font-normal text-sm" type="button" onClick={() => signIn('google')}>
               <svg className="size-4" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -441,6 +382,11 @@ export default function LoginPage() {
               </Label>
             </div>
 
+            {/* Login error */}
+            {loginError && (
+              <p className="text-sm text-destructive text-center">{loginError}</p>
+            )}
+
             {/* Submit */}
             <Button
               type="submit"
@@ -458,58 +404,61 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Quick Demo Access
-              </span>
-            </div>
-          </div>
-
-          {/* Demo Account Cards */}
-          <div className="grid grid-cols-2 gap-2 mb-6">
-            {DEMO_ACCOUNTS.map((account, idx) => (
-              <motion.button
-                key={account.label}
-                type="button"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.7 + idx * 0.08 }}
-                onClick={() => handleDemoClick(account.email)}
-                className={cn(
-                  'flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all duration-200 group',
-                  'hover:shadow-md hover:scale-[1.02] active:scale-[0.98]',
-                  account.color,
-                  email === account.email && 'ring-2 ring-primary/30 shadow-md bg-muted/30',
-                )}
+          {/* 1-Tap Demo Logins */}
+          <div className="mt-8">
+            <p className="text-xs text-muted-foreground uppercase text-center mb-4 font-semibold tracking-wider">
+              1-Tap Demo Login
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={() => {
+                  setIsLoading(true);
+                  performLogin('patient@lifelink.com', 'Demo@12345').finally(() => setIsLoading(false));
+                }}
+                disabled={isLoading}
               >
-                <div className={cn(
-                  'flex items-center justify-center size-8 rounded-full text-white text-xs font-bold shrink-0',
-                  account.avatarColor,
-                )}>
-                  {account.description.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-sm font-medium block truncate">{account.label}</span>
-                  <span className="text-[10px] text-muted-foreground truncate block">{account.description}</span>
-                </div>
-                <svg className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </motion.button>
-            ))}
+                <User className="size-4 mr-2 text-rose-500" /> Patient
+              </Button>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={() => {
+                  setIsLoading(true);
+                  performLogin('driver@lifelink.com', 'Demo@12345').finally(() => setIsLoading(false));
+                }}
+                disabled={isLoading}
+              >
+                <Truck className="size-4 mr-2 text-sky-500" /> Driver
+              </Button>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={() => {
+                  setIsLoading(true);
+                  performLogin('hospital@lifelink.com', 'Demo@12345').finally(() => setIsLoading(false));
+                }}
+                disabled={isLoading}
+              >
+                <Building2 className="size-4 mr-2 text-emerald-500" /> Hospital
+              </Button>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={() => {
+                  setIsLoading(true);
+                  performLogin('admin@lifelink.com', 'Demo@12345').finally(() => setIsLoading(false));
+                }}
+                disabled={isLoading}
+              >
+                <ShieldCheck className="size-4 mr-2 text-indigo-500" /> Admin
+              </Button>
+            </div>
           </div>
-
-          <p className="text-xs text-muted-foreground text-center mb-6">
-            Password is pre-filled: <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{DEMO_PASSWORD}</code>
-          </p>
 
           {/* Sign Up Link */}
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-muted-foreground mt-8">
             Don&apos;t have an account?{' '}
             <button
               onClick={() => useNavigationStore.getState().setCurrentPage('signup')}

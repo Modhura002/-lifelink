@@ -29,10 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useNavigationStore } from '@/store';
-import { DEMO_PATIENTS } from '@/lib/mock-data';
 import { BLOOD_GROUP_LABELS } from '@/lib/constants';
-
-const patient = DEMO_PATIENTS[0];
 
 // Extended mock data for fields not on the User type
 const MOCK_PATIENT_EXTENDED = {
@@ -90,6 +87,42 @@ const stagger = {
 
 export default function EmergencyProfilePage() {
   const { setCurrentPage } = useNavigationStore();
+  
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // In a real scenario, this page is just a preview.
+  // The actual public URL uses /emergency/[id]/page.tsx
+  // We'll fetch the current user's profile for preview.
+  useEffect(() => {
+    fetch('/api/auth/session')
+      .then((r) => r.json())
+      .then((session) => {
+        if (session?.user?.id) {
+          return fetch(`/api/users/${session.user.id}`);
+        }
+        throw new Error('No user');
+      })
+      .then((r) => r.json())
+      .then((data) => {
+        setProfile(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const patient = profile ? {
+    ...profile,
+    bloodGroup: profile?.patientProfile?.bloodGroup || 'O_POS',
+    allergies: profile?.patientProfile?.allergies ? JSON.parse(profile.patientProfile.allergies) : [],
+    chronicConditions: profile?.patientProfile?.chronicConditions ? JSON.parse(profile.patientProfile.chronicConditions) : [],
+    currentMedications: profile?.patientProfile?.currentMedications ? JSON.parse(profile.patientProfile.currentMedications) : [],
+    emergencyContacts: profile?.emergencyContacts || [],
+  } : {
+    id: '0000', name: 'Loading...', gender: 'N/A', dateOfBirth: '1990-01-01', bloodGroup: 'O_POS',
+    allergies: [], chronicConditions: [], currentMedications: [], emergencyContacts: [], address: '', createdAt: new Date()
+  };
+
   const age = calculateAge(patient.dateOfBirth || '1990-01-01');
   const bloodLabel = BLOOD_GROUP_LABELS[patient.bloodGroup || 'O_POS'];
 

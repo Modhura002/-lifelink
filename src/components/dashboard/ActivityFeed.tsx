@@ -14,7 +14,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigationStore, useUIStore } from '@/store';
-import { DEMO_EMERGENCIES } from '@/lib/mock-data';
 import { getRelativeTime } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
@@ -74,21 +73,6 @@ export default function ActivityFeed() {
   const activities = useMemo<ActivityItem[]>(() => {
     const items: ActivityItem[] = [];
 
-    // Emergency events
-    DEMO_EMERGENCIES.slice(0, 3).forEach((em) => {
-      const isCompleted = em.status === 'COMPLETED';
-      items.push({
-        id: em.id,
-        icon: isCompleted ? CheckCircle2 : AlertCircle,
-        title: em.description || `Emergency ${em.id}`,
-        description: isCompleted
-          ? 'Emergency resolved and closed'
-          : `Status: ${em.status.replace(/_/g, ' ')}`,
-        time: getRelativeTime(em.createdAt),
-        type: 'emergency',
-      });
-    });
-
     // Notification items - map types to activity types
     notifications.slice(0, 4).forEach((n) => {
       const typeMap: Record<string, ActivityType> = {
@@ -134,38 +118,48 @@ export default function ActivityFeed() {
             animate="show"
             className="space-y-1 max-h-80 overflow-y-auto scrollbar-thin"
           >
-            {displayItems.map((item, index) => {
-              const style = ACTIVITY_STYLES[item.type];
-              return (
-                <motion.div
-                  key={item.id}
-                  variants={itemFade}
-                  transition={{ delay: index * 0.05 }}
-                  className="relative flex items-start gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors group"
-                >
-                  {/* Left colored bar */}
-                  <div className={cn('absolute left-0 top-2 bottom-2 w-0.5 rounded-full', style.barColor)} />
+            {displayItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
+                <Activity className="h-8 w-8 text-muted-foreground/30" />
+                <p className="text-sm font-medium text-muted-foreground">No activity yet</p>
+                <p className="text-xs text-muted-foreground/60">
+                  Your emergency events and system notifications will appear here.
+                </p>
+              </div>
+            ) : (
+              displayItems.map((item, index) => {
+                const style = ACTIVITY_STYLES[item.type];
+                return (
+                  <motion.div
+                    key={item.id}
+                    variants={itemFade}
+                    transition={{ delay: index * 0.05 }}
+                    className="relative flex items-start gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors group"
+                  >
+                    {/* Left colored bar */}
+                    <div className={cn('absolute left-0 top-2 bottom-2 w-0.5 rounded-full', style.barColor)} />
 
-                  {/* Icon */}
-                  <div className={cn('p-1.5 rounded-full shrink-0 ml-1', style.iconBg)}>
-                    <item.icon className={cn('h-3.5 w-3.5', style.iconColor)} />
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium truncate">{item.title}</p>
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        {item.time}
-                      </span>
+                    {/* Icon */}
+                    <div className={cn('p-1.5 rounded-full shrink-0 ml-1', style.iconBg)}>
+                      <item.icon className={cn('h-3.5 w-3.5', style.iconColor)} />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                      {item.description}
-                    </p>
-                  </div>
-                </motion.div>
-              );
-            })}
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium truncate">{item.title}</p>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                          {item.time}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                        {item.description}
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
           </motion.div>
 
           {/* View All Button */}

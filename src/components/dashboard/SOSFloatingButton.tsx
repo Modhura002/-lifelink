@@ -2,12 +2,15 @@
 
 import { motion } from 'framer-motion';
 import { Siren } from 'lucide-react';
-import { useNavigationStore, useAuthStore } from '@/store';
+import { useNavigationStore, useEmergencyStore } from '@/store';
+import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 
 export default function SOSFloatingButton() {
   const { currentPage, setCurrentPage } = useNavigationStore();
-  const { user } = useAuthStore();
+  const activateSOS = useEmergencyStore((s) => s.activateSOS);
+  const { data: session } = useSession();
+  const user = session?.user;
 
   const isVisible = user?.role === 'PATIENT' && currentPage !== 'sos';
 
@@ -20,7 +23,10 @@ export default function SOSFloatingButton() {
       transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.3 }}
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.95 }}
-      onClick={() => setCurrentPage('sos')}
+      onClick={() => {
+        activateSOS(3, 'Critical emergency reported', user?.name || 'Unknown', '');
+        setCurrentPage('sos');
+      }}
       className={cn(
         'fixed bottom-6 right-6 z-50',
         'w-14 h-14 sm:w-14 sm:h-14',

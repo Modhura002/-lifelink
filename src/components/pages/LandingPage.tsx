@@ -4,11 +4,13 @@ import { motion, useReducedMotion } from 'framer-motion';
 import LandingNavbar from '@/components/landing/LandingNavbar';
 import Hero from '@/components/landing/Hero';
 import Features from '@/components/landing/Features';
+import LiveFeed from '@/components/landing/LiveFeed';
 import HowItWorks from '@/components/landing/HowItWorks';
 import Stats from '@/components/landing/Stats';
 import Testimonials from '@/components/landing/Testimonials';
 import CTA from '@/components/landing/CTA';
 import Footer from '@/components/landing/Footer';
+import VideoShowcase from '@/components/landing/VideoShowcase';
 
 const sectionVariants = {
   hidden: { opacity: 0, y: 30 },
@@ -30,6 +32,15 @@ export default function LandingPage() {
           variants={sectionVariants}
         >
           <Features />
+        </motion.div>
+        <LiveFeed />
+        <motion.div
+          initial={prefersReducedMotion ? false : 'hidden'}
+          whileInView="visible"
+          viewport={{ once: true, margin: '-80px' }}
+          variants={sectionVariants}
+        >
+          <VideoShowcase />
         </motion.div>
         <motion.div
           initial={prefersReducedMotion ? false : 'hidden'}

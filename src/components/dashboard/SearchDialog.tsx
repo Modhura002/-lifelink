@@ -1,4 +1,5 @@
 'use client';
+import { useSession } from 'next-auth/react';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useNavigationStore, useAuthStore, useUIStore } from '@/store';
+import { useNavigationStore, useUIStore } from '@/store';
 import { cn } from '@/lib/utils';
 import type { PageRoute } from '@/types';
 
@@ -62,7 +63,8 @@ export default function SearchDialog() {
   const searchOpen = useUIStore((s) => s.searchOpen);
   const setSearchOpen = useUIStore((s) => s.setSearchOpen);
   const setCurrentPage = useNavigationStore((s) => s.setCurrentPage);
-  const user = useAuthStore((s) => s.user);
+  const { data: session } = useSession();
+  const user = session?.user;
 
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
